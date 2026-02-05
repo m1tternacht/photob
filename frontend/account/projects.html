@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мои проекты - Photobond</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="account.css">
+</head>
+<body>
+    <div class="overlay" id="overlay"></div>
+    <div id="header-container"></div>
+
+    <div class="account-layout">
+        <!-- Боковое меню -->
+        <aside class="account-sidebar">
+            <nav class="account-nav">
+                <a href="index.html" class="account-nav-item">Обзор</a>
+                <a href="projects.html" class="account-nav-item active">
+                    Проекты
+                    <span class="nav-count" id="projects-count">0</span>
+                </a>
+                <a href="orders.html" class="account-nav-item">Заказы</a>
+                <a href="galleries.html" class="account-nav-item">Галереи</a>
+                <div class="account-nav-divider"></div>
+                <a href="settings.html" class="account-nav-item">Настройки</a>
+                <button class="account-logout" id="logout-btn">Выход</button>
+            </nav>
+        </aside>
+
+        <!-- Основной контент -->
+        <main class="account-main">
+            <h1 class="account-page-title">Мои проекты</h1>
+            <p class="account-page-subtitle">Незавершённые проекты. Продолжите редактирование или оформите заказ.</p>
+
+            <div class="projects-layout">
+                <!-- Категории -->
+                <aside class="category-sidebar">
+                    <nav class="category-nav">
+                        <a href="#" class="category-item active" data-category="all">
+                            Все проекты
+                            <span class="category-count" id="count-all">0</span>
+                        </a>
+                        <a href="#" class="category-item" data-category="photobooks">
+                            Фотокниги
+                            <span class="category-count" id="count-photobooks">0</span>
+                        </a>
+                        <a href="#" class="category-item" data-category="prints">
+                            Фотопечать
+                            <span class="category-count" id="count-prints">0</span>
+                        </a>
+                        <a href="#" class="category-item" data-category="calendars">
+                            Календари
+                            <span class="category-count" id="count-calendars">0</span>
+                        </a>
+                        <a href="#" class="category-item" data-category="canvas">
+                            Холсты
+                            <span class="category-count" id="count-canvas">0</span>
+                        </a>
+                        <a href="#" class="category-item" data-category="postcards">
+                            Открытки
+                            <span class="category-count" id="count-postcards">0</span>
+                        </a>
+                        <a href="#" class="category-item" data-category="gifts">
+                            Подарки
+                            <span class="category-count" id="count-gifts">0</span>
+                        </a>
+                    </nav>
+                </aside>
+
+                <!-- Список проектов -->
+                <div class="projects-content">
+                    <!-- Фильтры -->
+                    <div class="filters-bar">
+                        <div class="filter-group">
+                            <label>Продукт</label>
+                            <select class="filter-select" id="filter-product">
+                                <option value="all">Все</option>
+                                <option value="photobook">Фотокнига</option>
+                                <option value="prints">Фотопечать</option>
+                                <option value="calendar">Календарь</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Размер</label>
+                            <select class="filter-select" id="filter-size">
+                                <option value="all">Все</option>
+                                <option value="10x10">10x10</option>
+                                <option value="20x20">20x20</option>
+                                <option value="30x30">30x30</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>Статус</label>
+                            <select class="filter-select" id="filter-status">
+                                <option value="all">Все</option>
+                                <option value="draft">Черновик</option>
+                                <option value="ready">Готов к заказу</option>
+                            </select>
+                        </div>
+                        <div class="filter-search">
+                            <input type="text" placeholder="Поиск" id="filter-search">
+                            <button type="button">🔍</button>
+                        </div>
+                        
+                        <div class="filters-right">
+                            <select class="sort-select" id="sort-by">
+                                <option value="date-desc">Дата изменения ↓</option>
+                                <option value="date-asc">Дата изменения ↑</option>
+                                <option value="name">По названию</option>
+                            </select>
+                            <button class="btn-create" id="create-project-btn">Создать проект</button>
+                        </div>
+                    </div>
+
+                    <!-- Список проектов -->
+                    <div class="projects-list" id="projects-list">
+                        <!-- Пример проекта -->
+                        <div class="project-list-item">
+                            <div class="project-list-preview">
+                                <img src="../images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="Превью">
+                            </div>
+                            <div class="project-list-details">
+                                <h3 class="project-list-title">
+                                    Premium Fabric Album: Создан 24.11.2025
+                                    <span>ID: B_309C89</span>
+                                </h3>
+                                <dl class="project-list-meta">
+                                    <dt>Продукт</dt>
+                                    <dd>10x10, Тканевая обложка, 20 страниц</dd>
+                                    <dt>Тема</dt>
+                                    <dd>Своя тема</dd>
+                                    <dt>Создан</dt>
+                                    <dd>24.11.2025</dd>
+                                    <dt>Изменён</dt>
+                                    <dd>13.01.2026</dd>
+                                </dl>
+                            </div>
+                            <div class="project-list-actions">
+                                <div class="project-status">
+                                    <span class="project-status-label">Статус</span>
+                                    <span class="project-status-value">15%</span>
+                                </div>
+                                <div class="project-action-btns">
+                                    <button class="project-icon-btn" title="Копировать">📋</button>
+                                    <button class="project-icon-btn" title="Удалить">🗑️</button>
+                                </div>
+                                <button class="btn-outline">Редактировать</button>
+                            </div>
+                        </div>
+
+                        <div class="project-list-item">
+                            <div class="project-list-preview">
+                                <img src="../images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Превью">
+                            </div>
+                            <div class="project-list-details">
+                                <h3 class="project-list-title">
+                                    Layflat Hardcover Photo Book: Создан 28.11.2023
+                                    <span>ID: B_2C667D</span>
+                                </h3>
+                                <dl class="project-list-meta">
+                                    <dt>Продукт</dt>
+                                    <dd>10x10, Твёрдая обложка, 20 страниц</dd>
+                                    <dt>Тема</dt>
+                                    <dd>At Last</dd>
+                                    <dt>Создан</dt>
+                                    <dd>28.11.2023</dd>
+                                    <dt>Изменён</dt>
+                                    <dd>28.11.2023</dd>
+                                </dl>
+                            </div>
+                            <div class="project-list-actions">
+                                <div class="project-status">
+                                    <span class="project-status-label">Статус</span>
+                                    <span class="project-status-value">50%</span>
+                                </div>
+                                <div class="project-action-btns">
+                                    <button class="project-icon-btn" title="Копировать">📋</button>
+                                    <button class="project-icon-btn" title="Удалить">🗑️</button>
+                                </div>
+                                <button class="btn-outline">Редактировать</button>
+                            </div>
+                        </div>
+
+                        <!-- Пустое состояние -->
+                        <div class="empty-state" id="projects-empty" style="display: none;">
+                            <p>Нет проектов в этой категории</p>
+                            <a href="../index.html" class="btn-outline">Создать проект</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <div id="footer-common-container"></div>
+
+    <script src="../script.js"></script>
+    <script src="account.js"></script>
+</body>
+</html>
