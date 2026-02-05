@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Печать на холсте - Printique</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="overlay" id="overlay"></div>
+    <div id="header-container"></div>
+
+    <!-- Хлебные крошки -->
+    <div class="breadcrumbs">
+        <a href="index.html">Главная</a> > <span>Печать на холсте</span>
+    </div>
+
+    <!-- Уникальный контент страницы -->
+    <section class="content">
+        <div class="content-wrapper">
+            <div class="content-left">
+                <div class="image-stack">
+                    <img src="/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Фото 1" class="gallery-image">
+                    <div class="small-images">
+                        <img src="/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Фото 2" class="gallery-image">
+                        <img src="/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Фото 3" class="gallery-image">
+                    </div>
+                    <img src="/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Фото 4" class="gallery-image">
+                    <div class="small-images">
+                        <img src="https://via.placeholder.com/480x480?text=5" alt="Фото 5" class="gallery-image">
+                        <img src="https://via.placeholder.com/480x480?text=6" alt="Фото 6" class="gallery-image">
+                    </div>
+                    <img src="https://via.placeholder.com/980x600?text=7" alt="Фото 7" class="gallery-image">
+                    <div class="small-images">
+                        <img src="https://via.placeholder.com/480x480?text=8" alt="Фото 8" class="gallery-image">
+                        <img src="https://via.placeholder.com/480x480?text=9" alt="Фото 9" class="gallery-image">
+                    </div>
+                </div>
+                <button class="slider-btn prev"><</button>
+                <button class="slider-btn next">></button>
+            </div>
+            <div class="content-right">
+                <h2 class="purchase-title">Печать на холсте</h2>
+                <div class="purchase-options">
+                    <div class="option-group">
+                        <p class="purchase-option"><strong>Размер:</strong> <span id="size-display">30х40</span></p>
+                        <div class="option-buttons" id="size-buttons">
+                            <button class="option-btn active" data-value="30х40">30х40</button>
+                            <button class="option-btn" data-value="40х60">40х60</button>
+                            <button class="option-btn" data-value="50х70">50х70</button>
+                            <button class="option-btn" data-value="60х90">60х90</button>
+                            <button class="option-btn" data-value="30х30">30х30</button>
+                            <button class="option-btn" data-value="40х40">40х40</button>
+                            <button class="option-btn" data-value="50х50">50х50</button>
+                            <button class="option-btn" data-value="60х60">60х60</button>
+                            <button class="option-btn" data-value="70х70">70х70</button>
+                            <button class="option-btn" data-value="90х90">90х90</button>
+                        </div>
+                        <p class="purchase-option custom-size-label"><strong>Нестандартный размер:</strong></p>
+                        <div class="custom-size">
+                            <input type="number" id="custom-width" placeholder="Ширина" min="1" max="90">
+                            <span class="custom-size-separator">×</span>
+                            <input type="number" id="custom-height" placeholder="Высота" min="1" max="90">
+                            <span>см</span>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <p class="purchase-option"><strong>Режим:</strong> <span id="mode-display">Детальный</span></p>
+                        <div class="option-buttons" id="mode-buttons">
+                            <button class="option-btn active" data-value="Детальный">Детальный</button>
+                            <button class="option-btn" data-value="Экспресс">Экспресс</button>
+                        </div>
+                    </div>
+                    <div class="purchase-price">Цена: <span id="price-display">1200</span> руб.</div>
+                    <button class="btn btn-order">Заказать</button>
+                    <hr class="divider">
+                    <details class="accordion">
+                        <summary>Описание</summary>
+                        <p>Печать на холсте выполняется с использованием высококачественных материалов и струйной технологии. Ваши фотографии превращаются в произведения искусства с яркими цветами и долговечностью.</p>
+                    </details>
+                    <hr class="divider">
+                    <details class="accordion">
+                        <summary>Доставка</summary>
+                        <p></p>
+                    </details>
+                    <hr class="divider">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <div id="recommendations-container"></div>
+    <!-- Уникальный текст для этой страницы -->
+    <hr class="divider content-width">
+    <section class="text-content">
+        <p>На этой странице вы можете заказать печать ваших фотографий на холсте в различных размерах.</p>
+        <p>Мы предлагаем качественную печать для создания уникального декора вашего дома.</p>
+    </section>
+
+    <div id="footer-common-container"></div>
+    
+    <script src="script.js"></script>
+</body>
+</html>

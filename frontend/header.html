@@ -1,0 +1,179 @@
+<div class="logo-bar">
+    <div class="logo">
+        <img src="/frontend/images/logo_photobond.png" alt="Photobond Logo">
+    </div>
+    <div class="auth-cart">
+        <a href="#" class="auth-link" id="auth-toggle">
+            <img src="/frontend/images/icon-user.png" alt="Пользователь" class="auth-icon">
+            <span class="auth-text" id="auth-text">Регистрация/Войти</span>
+        </a>
+        <button class="burger-menu" id="burger-toggle">
+            <img src="/frontend/images/icon-burger.png" alt="Меню" class="burger-icon">
+            <img src="/frontend/images/icon-cross.png" alt="Закрыть" class="cross-icon">
+        </button>
+    </div>
+    
+    <!-- Auth dropdown - форма входа/регистрации -->
+    <div class="auth-dropdown" id="auth-dropdown">
+        <!-- Форма входа -->
+        <form class="auth-form login-form active" id="login-form">
+            <h3>Вход</h3>
+            <label>
+                Логин:
+                <input type="text" id="login-username" placeholder="Имя пользователя" required>
+            </label>
+            <label>
+                Пароль:
+                <input type="password" id="login-password" placeholder="Пароль" required>
+            </label>
+            <button type="submit" class="btn">Войти</button>
+            <p class="switch-text">Впервые на нашем сайте? <span class="switch-link register-switch"><b>Зарегистрируйтесь</b></span></p>
+        </form>
+      
+        <!-- Форма регистрации -->
+        <form class="auth-form register-form" id="register-form">
+            <h3>Регистрация</h3>
+            <label>
+                Имя пользователя:
+                <input type="text" id="register-username" placeholder="Имя пользователя" required>
+            </label>
+            <label>
+                E-mail:
+                <input type="email" id="register-email" placeholder="Введите email" required>
+            </label>
+            <label>
+                Пароль:
+                <input type="password" id="register-password" placeholder="Введите пароль" required>
+            </label>
+            <button type="submit" class="btn">Зарегистрироваться</button>
+            <p class="switch-text">Есть аккаунт? <span class="switch-link login-switch">Войдите</span></p>
+        </form>
+      
+        <button class="close-btn">
+            <img src="/frontend/images/icon-cross.png" alt="Закрыть" class="close-icon">
+        </button>
+    </div>
+    
+    <!-- User menu dropdown - меню для авторизованного пользователя -->
+    <div class="auth-dropdown user-menu-dropdown" id="user-menu-dropdown">
+        <h3 id="user-menu-greeting">Личный кабинет</h3>
+        <nav class="user-menu-nav">
+            <a href="/frontend/account/index.html" class="user-menu-item">
+             
+                Обзор
+            </a>
+            <a href="/frontend/account/projects.html" class="user-menu-item">
+                
+                Мои проекты
+            </a>
+            <a href="/frontend/account/orders.html" class="user-menu-item">
+                
+                Заказы
+            </a>
+            <a href="/frontend/account/galleries.html" class="user-menu-item">
+                
+                Галереи
+            </a>
+            <a href="/frontend/account/settings.html" class="user-menu-item">
+                
+                Настройки
+            </a>
+        </nav>
+        <div class="user-menu-divider"></div>
+        <button class="user-menu-logout" id="header-logout-btn">
+            Выйти
+        </button>
+        <button class="close-btn">
+            <img src="/frontend/images/icon-cross.png" alt="Закрыть" class="close-icon">
+        </button>
+    </div>
+</div>
+
+<header>
+    <nav class="nav-menu" id="nav-menu">
+        <button class="menu-close-btn">
+            <img src="/frontend/images/icon-cross.png" alt="Закрыть" class="close-icon">
+        </button>
+        <ul class="main-menu">
+            <li class="dropdown" data-menu="photoprint">
+                <a href="/frontend/photoprint.html">Фотопечать<img src="/frontend/images/icon-right.png" alt="Подменю" class="submenu-icon"></a>
+            </li>
+            <li><a href="/frontend/canvas.html">Печать на холсте</a></li>
+            <li><a href="/frontend/photobooks.html">Фотокниги</a></li>
+            <li class="dropdown" data-menu="calendars">
+                <a href="/frontend/calendars.html">Календари<img src="/frontend/images/icon-right.png" alt="Подменю" class="submenu-icon"></a>
+            </li>
+            <li><a href="/frontend/postcards.html">Открытки</a></li>
+            <li><a href="/frontend/documents.html">Фото на документы</a></li>
+            <li class="dropdown" data-menu="polygraphy">
+                <a href="/frontend/polygraphy.html">Полиграфия<img src="/frontend/images/icon-right.png" alt="Подменю" class="submenu-icon"></a>
+            </li>
+        </ul>
+        
+        <!-- Мобильное подменю -->
+        <div class="submenu-container" id="submenu-container"></div>
+    </nav>
+    
+    <!-- Fullwidth Mega Menu -->
+    <div class="mega-menu" id="mega-menu">
+        <!-- Фотопечать -->
+        <div class="mega-menu-panel" data-panel="photoprint">
+            <div class="mega-menu-content">
+                <div class="mega-menu-image">
+                    <img src="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="Фотопечать" id="photoprint-img">
+                    <div class="mega-menu-image-caption" id="photoprint-caption">Качественная фотопечать для ваших воспоминаний</div>
+                </div>
+                <div class="mega-menu-links">
+                    <h3>Фотопечать</h3>
+                    <ul>
+                        <li><a href="/frontend/standard-photos.html" data-img="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" data-desc="Печать фотографий стандартных размеров от 10х15 до 30х42">Стандартные фото</a></li>
+                        <li><a href="/frontend/polaroid-print.html" data-img="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" data-desc="Печать фотографий в стиле Полароид с белой рамкой">Печать в стиле "Полароид"</a></li>
+                        <li><a href="#" data-img="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" data-desc="Большие форматы для декора и подарков">Постеры</a></li>
+                        <li><a href="#" data-img="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" data-desc="Широкоформатная печать для больших проектов">Широкоформатная печать</a></li>
+                    </ul>
+                    <a href="/frontend/photoprint.html" class="mega-menu-view-all">Смотреть все →</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Календари -->
+        <div class="mega-menu-panel" data-panel="calendars">
+            <div class="mega-menu-content">
+                <div class="mega-menu-image">
+                    <img src="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Календари" id="calendars-img">
+                    <div class="mega-menu-image-caption" id="calendars-caption">Персональные календари с вашими фотографиями</div>
+                </div>
+                <div class="mega-menu-links">
+                    <h3>Календари</h3>
+                    <ul>
+                        <li><a href="#" data-img="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" data-desc="Календари с перекидными листами на каждый месяц">Перекидные календари</a></li>
+                        <li><a href="#" data-img="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" data-desc="Календари в виде журнала с вашими фото">Журнальные календари</a></li>
+                        <li><a href="#" data-img="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" data-desc="Календари с тремя месяцами на странице">Квартальные календари</a></li>
+                        <li><a href="#" data-img="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" data-desc="Магнитные календари для холодильника">Магнитные календари</a></li>
+                        <li><a href="#" data-img="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" data-desc="Компактные календари для кармана">Карманные календари</a></li>
+                        <li><a href="#" data-img="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" data-desc="Большие календари в виде постера">Календари-постеры</a></li>
+                    </ul>
+                    <a href="/frontend/calendars.html" class="mega-menu-view-all">Смотреть все →</a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Полиграфия -->
+        <div class="mega-menu-panel" data-panel="polygraphy">
+            <div class="mega-menu-content">
+                <div class="mega-menu-image">
+                    <img src="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="Полиграфия" id="polygraphy-img">
+                    <div class="mega-menu-image-caption" id="polygraphy-caption">Профессиональная полиграфия для бизнеса</div>
+                </div>
+                <div class="mega-menu-links">
+                    <h3>Полиграфия</h3>
+                    <ul>
+                        <li><a href="#" data-img="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" data-desc="Печать документов любой сложности">Печать документов</a></li>
+                        <li><a href="#" data-img="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" data-desc="Стильные визитки для вашего бизнеса">Визитки</a></li>
+                    </ul>
+                    <a href="/frontend/polygraphy.html" class="mega-menu-view-all">Смотреть все →</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

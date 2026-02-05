@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Настройки - Photobond</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="account.css">
+</head>
+<body>
+    <div class="overlay" id="overlay"></div>
+    <div id="header-container"></div>
+
+    <div class="account-layout">
+        <!-- Боковое меню -->
+        <aside class="account-sidebar">
+            <nav class="account-nav">
+                <a href="index.html" class="account-nav-item">Обзор</a>
+                <a href="projects.html" class="account-nav-item">
+                    Проекты
+                    <span class="nav-count" id="projects-count">0</span>
+                </a>
+                <a href="orders.html" class="account-nav-item">Заказы</a>
+                <a href="galleries.html" class="account-nav-item">Галереи</a>
+                <div class="account-nav-divider"></div>
+                <a href="settings.html" class="account-nav-item active">Настройки</a>
+                <button class="account-logout" id="logout-btn">Выход</button>
+            </nav>
+        </aside>
+
+        <!-- Основной контент -->
+        <main class="account-main">
+            <h1 class="account-page-title">Информация об аккаунте</h1>
+
+            <form class="settings-form" id="settings-form">
+                <!-- Основная информация -->
+                <div class="form-section">
+                    <h3 class="form-section-title">Основная информация</h3>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Имя</label>
+                        <input type="text" class="form-input" id="first-name" placeholder="Введите имя">
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Фамилия</label>
+                        <input type="text" class="form-input" id="last-name" placeholder="Введите фамилию">
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Email</label>
+                        <input type="email" class="form-input" id="email" disabled>
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Пароль</label>
+                        <input type="password" class="form-input" value="******" disabled style="max-width: 200px;">
+                        <button type="button" class="form-btn" id="change-password-btn">Изменить пароль</button>
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Хранилище</label>
+                        <span class="form-value" id="storage-used">0 МБ использовано</span>
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Род деятельности</label>
+                        <select class="form-select" id="user-type">
+                            <option value="personal">Личное использование</option>
+                            <option value="hobbyist">Фотограф-любитель</option>
+                            <option value="professional">Профессиональный фотограф</option>
+                            <option value="business">Бизнес</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Тип аккаунта</label>
+                        <span class="form-value">Базовый</span>
+                        <button type="button" class="form-btn form-btn-primary" id="upgrade-btn">Перейти на PRO</button>
+                    </div>
+                </div>
+
+                <!-- Адрес доставки -->
+                <div class="form-section">
+                    <h3 class="form-section-title">Адрес доставки по умолчанию</h3>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Город</label>
+                        <input type="text" class="form-input" id="city" placeholder="Москва">
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Адрес</label>
+                        <input type="text" class="form-input" id="address" placeholder="ул. Примерная, д. 1, кв. 1">
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Индекс</label>
+                        <input type="text" class="form-input" id="postal-code" placeholder="123456" style="max-width: 150px;">
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Телефон</label>
+                        <input type="tel" class="form-input" id="phone" placeholder="+7 (999) 123-45-67">
+                    </div>
+                </div>
+
+                <!-- Уведомления -->
+                <div class="form-section">
+                    <h3 class="form-section-title">Уведомления</h3>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Статус заказов</label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="notify-orders" checked>
+                            <span style="font-size: 14px; color: #666;">Получать уведомления о статусе заказов</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Акции и скидки</label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="notify-promo" checked>
+                            <span style="font-size: 14px; color: #666;">Получать информацию об акциях</span>
+                        </label>
+                    </div>
+                    
+                    <div class="form-row">
+                        <label class="form-label">Новости</label>
+                        <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                            <input type="checkbox" id="notify-news">
+                            <span style="font-size: 14px; color: #666;">Получать новости сервиса</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="form-row" style="margin-top: 30px;">
+                    <label class="form-label"></label>
+                    <button type="submit" class="btn-create">Сохранить изменения</button>
+                </div>
+            </form>
+        </main>
+    </div>
+
+    <!-- Модальное окно смены пароля -->
+    <div class="modal" id="password-modal">
+        <div class="modal-content">
+            <button class="modal-close" id="password-modal-close">&times;</button>
+            <h2 class="modal-title">Изменить пароль</h2>
+            <form id="password-form" class="modal-form">
+                <div class="form-group">
+                    <label for="current-password">Текущий пароль</label>
+                    <input type="password" id="current-password" required>
+                </div>
+                <div class="form-group">
+                    <label for="new-password">Новый пароль</label>
+                    <input type="password" id="new-password" required>
+                    <p class="upload-hint">Минимум 8 символов</p>
+                </div>
+                <div class="form-group">
+                    <label for="confirm-password">Подтвердите пароль</label>
+                    <input type="password" id="confirm-password" required>
+                </div>
+                <div class="modal-actions">
+                    <button type="button" class="btn-outline" id="cancel-password">Отмена</button>
+                    <button type="submit" class="btn-create">Изменить</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="footer-common-container"></div>
+
+    <script src="../script.js"></script>
+    <script src="account.js"></script>
+</body>
+</html>

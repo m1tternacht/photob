@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Печать фотографий - Photobond</title>
+    <link rel="stylesheet" href="print-app.css">
+</head>
+<body>
+    <!-- Шапка приложения -->
+    <header class="app-header">
+        <a href="/frontend/index.html" class="app-logo">
+            <img src="/frontend/images/logo_photobond.png" alt="Photobond">
+        </a>
+        <div class="app-user">
+            Привет, <span id="user-name">Гость</span>
+        </div>
+    </header>
+
+    <!-- Навигация по шагам -->
+    <nav class="steps-nav">
+        <div class="steps-list">
+            <button class="step-item active" data-step="1">
+                <span class="step-label">Шаг 1:</span> Загрузка фото
+            </button>
+            <button class="step-item" data-step="2">
+                <span class="step-label">Шаг 2:</span> Настройки печати
+            </button>
+            <button class="step-item" data-step="3">
+                <span class="step-label">Шаг 3:</span> Предпросмотр
+            </button>
+        </div>
+        <div class="steps-info">
+            <span class="photos-count"><span id="total-photos">0</span> фотографий</span>
+            <button class="btn-add-more" id="btn-add-more">Добавить</button>
+        </div>
+    </nav>
+
+    <!-- Основной контент -->
+    <main class="app-content">
+        <!-- ШАГ 1: Загрузка фото -->
+        <section class="step-content active" data-step="1">
+            <h1 class="step-title">Загрузите фотографии</h1>
+            
+            <div class="upload-sources" id="upload-sources">
+                <button class="source-card" id="source-upload">
+                    <div class="source-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <span class="source-name">Загрузить</span>
+                    <input type="file" id="file-input" multiple accept="image/*" hidden>
+                </button>
+                
+                <button class="source-card" id="source-gallery">
+                    <div class="source-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                    </div>
+                    <span class="source-name">Галерея</span>
+                </button>
+                
+                <button class="source-card disabled" title="Скоро">
+                    <div class="source-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <span class="source-name">Yandex.Disk</span>
+                </button>
+                
+                <button class="source-card disabled" title="Скоро">
+                    <div class="source-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M22.54 6.42a2.78 2.78 0 0 0-1.94-2C18.88 4 12 4 12 4s-6.88 0-8.6.46a2.78 2.78 0 0 0-1.94 2A29 29 0 0 0 1 11.75a29 29 0 0 0 .46 5.33A2.78 2.78 0 0 0 3.4 19c1.72.46 8.6.46 8.6.46s6.88 0 8.6-.46a2.78 2.78 0 0 0 1.94-2 29 29 0 0 0 .46-5.25 29 29 0 0 0-.46-5.33z"/>
+                        </svg>
+                    </div>
+                    <span class="source-name">Mail.Cloud</span>
+                </button>
+            </div>
+
+            <!-- Выбор из галереи -->
+            <div class="gallery-picker" id="gallery-picker" style="display: none;">
+                <div class="gallery-picker-header">
+                    <h2>Выберите фотографии</h2>
+                    <div class="gallery-picker-tabs">
+                        <button class="source-tab active" id="tab-upload">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                <polyline points="17 8 12 3 7 8"/>
+                                <line x1="12" y1="3" x2="12" y2="15"/>
+                            </svg>
+                            Загрузить
+                        </button>
+                        <button class="source-tab" id="tab-gallery">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                                <circle cx="8.5" cy="8.5" r="1.5"/>
+                                <polyline points="21 15 16 10 5 21"/>
+                            </svg>
+                            Галерея
+                        </button>
+                        <button class="source-tab disabled">
+                            Yandex.Disk
+                        </button>
+                        <button class="source-tab disabled">
+                            Mail.Cloud
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="galleries-list" id="galleries-list">
+                    <!-- Галереи загрузятся через JS -->
+                </div>
+                
+                <div class="gallery-photos" id="gallery-photos" style="display: none;">
+                    <!-- Фото из выбранной галереи -->
+                </div>
+            </div>
+
+            <!-- Превью загруженных фото -->
+            <div class="uploaded-photos" id="uploaded-photos" style="display: none;">
+                <h2>Загруженные фотографии</h2>
+                <div class="photos-grid" id="photos-grid">
+                    <!-- Превью фото -->
+                </div>
+            </div>
+        </section>
+
+        <!-- ШАГ 2: Настройки печати -->
+        <section class="step-content" data-step="2">
+            <h1 class="step-title">Настройки печати</h1>
+            
+            <div class="settings-controls">
+                <label>Сортировка по:</label>
+                <select id="sort-by">
+                    <option value="name-asc">Имени (А-Я)</option>
+                    <option value="name-desc">Имени (Я-А)</option>
+                    <option value="date-asc">Дате (сначала старые)</option>
+                    <option value="date-desc">Дате (сначала новые)</option>
+                </select>
+            </div>
+            
+            <div class="photos-settings-list" id="photos-settings-list">
+                <!-- Список фото с настройками -->
+            </div>
+        </section>
+
+        <!-- ШАГ 3: Предпросмотр -->
+        <section class="step-content" data-step="3">
+            <h1 class="step-title">Предпросмотр</h1>
+            <p class="step-subtitle">В зависимости от размера ваших фото, может понадобиться кадрирование. <a href="#" id="crop-info-link">ПОДРОБНЕЕ</a></p>
+            
+            <div class="preview-header">
+                <div class="preview-settings">
+                    <label>Название проекта</label>
+                    <input type="text" id="project-name" placeholder="Название проекта" value="Проект печати">
+                </div>
+            </div>
+            
+            <div class="preview-filters-bar">
+                <div class="filters-left">
+                    <span class="filter-label">Фильтр:</span>
+                    <button class="filter-btn active" data-filter="all">В печать: <span id="filter-total">0</span> /Загружено: <span id="filter-loaded">0</span></button>
+                    <button class="filter-btn" data-filter="sized">в размер: <span id="filter-sized">0</span></button>
+                    <button class="filter-btn" data-filter="review">на проверку: <span id="filter-review">0</span></button>
+                </div>
+                
+                <div class="filters-right">
+                    <span>группировать:</span>
+                    <button class="group-btn active" data-group="size">Размер</button>
+                    <button class="group-btn" data-group="photo">Фото</button>
+                </div>
+            </div>
+            
+            <div class="preview-grid" id="preview-grid">
+                <!-- Превью фото сгруппированные по размеру -->
+            </div>
+        </section>
+    </main>
+
+    <!-- Нижняя панель -->
+    <footer class="app-footer">
+        <div class="footer-left">
+            <span class="total-price">Стоимость: <strong id="total-price">0</strong> рублей</span>
+        </div>
+        <div class="footer-right">
+            <button class="btn-save" id="btn-save">Сохранить</button>
+            <button class="btn-continue" id="btn-continue">Продолжить</button>
+        </div>
+    </footer>
+
+    <!-- Модальное окно редактора -->
+    <div class="modal" id="editor-modal">
+        <div class="modal-content editor-modal-content">
+            <button class="modal-close">&times;</button>
+            <h2 class="modal-title">Предпросмотр</h2>
+            
+            <div class="editor-layout">
+                <div class="editor-main">
+                    <div class="editor-counter">
+                        <span id="editor-current">1</span> / <span id="editor-total">1</span>
+                    </div>
+                    <div class="editor-filename" id="editor-filename">Файл.jpg</div>
+                    
+                    <div class="editor-canvas-wrapper">
+                        <button class="editor-nav editor-prev" id="editor-prev">&lt;</button>
+                        <div class="editor-canvas" id="editor-canvas">
+                            <div class="crop-frame" id="crop-frame">
+                                <img id="editor-image" src="" alt="">
+                            </div>
+                        </div>
+                        <button class="editor-nav editor-next" id="editor-next">&gt;</button>
+                    </div>
+                </div>
+                
+                <div class="editor-sidebar">
+                    <h3>Настройки</h3>
+                    
+                    <div class="editor-option">
+                        <label>Размер</label>
+                        <select id="editor-size">
+                            <!-- Размеры загрузятся динамически -->
+                        </select>
+                    </div>
+                    
+                    <div class="editor-option">
+                        <label>Поворот</label>
+                        <div class="rotate-buttons">
+                            <button class="rotate-btn" id="rotate-frame-left" title="Повернуть рамку влево">↺ Рамка</button>
+                            <button class="rotate-btn" id="rotate-photo-right" title="Повернуть фото вправо">↻ Фото</button>
+                        </div>
+                    </div>
+                    
+                    <div class="editor-option">
+                        <label>Цвет</label>
+                        <div class="color-options">
+                            <label class="color-radio">
+                                <input type="radio" name="color-filter" value="original" checked>
+                                <span>Оригинал</span>
+                            </label>
+                            <label class="color-radio">
+                                <input type="radio" name="color-filter" value="grayscale">
+                                <span>Чёрно-белое</span>
+                            </label>
+                            <label class="color-radio">
+                                <input type="radio" name="color-filter" value="sepia">
+                                <span>Сепия</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div class="editor-option">
+                        <label>Кадрирование</label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="editor-full-image">
+                            <span>Вся картинка (с полями)</span>
+                        </label>
+                        <a href="#" class="apply-to-all-link" id="apply-crop-all">Применить ко всем фото</a>
+                    </div>
+                    
+                    <div class="editor-option">
+                        <label>Зум</label>
+                        <input type="range" id="editor-zoom" min="100" max="200" value="100">
+                    </div>
+                    
+                    <button class="btn-apply-editor" id="btn-apply-editor">Применить</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно информации об обрезке -->
+    <div class="modal" id="crop-info-modal">
+        <div class="modal-content">
+            <button class="modal-close">&times;</button>
+            <h2 class="modal-title">Почему мои фотографии обрезаются?</h2>
+            
+            <div class="info-content">
+                <p><em>Большинство цифровых камер делают снимки с другим соотношением сторон, чем традиционный отпечаток 4×6. Если разделить высоту цифрового изображения на ширину, получится соотношение примерно 4:3, тогда как у формата 4×6 соотношение 3:2.</em></p>
+                
+                <p><em>Изначально цифровые камеры создавались для экранов компьютеров (например, 640×480 и 800×600). Разница в пропорциях означает, что большинство цифровых изображений не помещаются целиком в формат 4×6, и часть изображения приходится обрезать.</em></p>
+                
+                <h3>Типичные проблемы при обрезке:</h3>
+                <div class="crop-examples">
+                    <div class="crop-example">
+                        <img src="/frontend/images/crop-example-1.jpg" alt="Обрезаны головы по бокам">
+                        <span>Обрезаны головы по бокам</span>
+                    </div>
+                    <div class="crop-example">
+                        <img src="/frontend/images/crop-example-2.jpg" alt="Обрезана верхняя часть головы">
+                        <span>Обрезана верхняя часть головы</span>
+                    </div>
+                </div>
+                
+                <h3>А. Выберите область изображения, которую не нужно обрезать:</h3>
+                <p><em>На этапе предпросмотра обрезки вы увидите пунктирную рамку вокруг изображений. Всё, что находится за пределами рамки, будет обрезано. Вы можете перемещать изображение так, чтобы все важные части оказались внутри пунктирной рамки.</em></p>
+                
+                <h3>В. Печать полного изображения</h3>
+                <p><em>Если невозможно уместить все важные части в рамку, вы можете выбрать печать без обрезки. Фото будет напечатано целиком, но в местах несовпадения пропорций появятся белые поля.</em></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно подтверждения заказа -->
+    <div class="modal" id="order-modal">
+        <div class="modal-content order-modal-content">
+            <button class="modal-close">&times;</button>
+            <h2 class="modal-title">Заказать</h2>
+            
+            <div class="order-summary">
+                <div class="order-preview">
+                    <div class="order-preview-thumb" id="order-preview-thumb"></div>
+                    <div class="order-info">
+                        <div class="order-project-name" id="order-project-name">Проект №1</div>
+                        <div class="order-details">
+                            <span id="order-photos-count">0 фото</span>
+                            <div class="order-sizes" id="order-size"></div>
+                            <a href="#" class="edit-order-link">редактировать</a>
+                        </div>
+                        <div class="order-cost">
+                            Стоимость: <strong id="order-cost">0</strong> рублей.
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <button class="btn-order" id="btn-order">Заказать</button>
+        </div>
+    </div>
+
+    <script src="print-app.js"></script>
+</body>
+</html>
