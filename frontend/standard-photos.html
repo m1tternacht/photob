@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Стандартные фото - Printique</title>
+    <title>Стандартные фото - Photobond</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -42,16 +42,17 @@
             <div class="content-right">
                 <h2 class="purchase-title">Стандартные фото</h2>
                 <div class="purchase-options">
+                    <!-- Размер -->
                     <div class="option-group">
-                        <p class="purchase-option"><strong>Размер:</strong> <span id="size-display">10х15</span></p>
+                        <p class="purchase-option"><strong>Размер:</strong> <span id="size-display">—</span></p>
                         <div class="option-buttons" id="size-buttons">
-                            <button class="option-btn active" data-value="10х15" data-price="15">10х15</button>
-                            <button class="option-btn" data-value="13х18" data-price="20">13х18</button>
-                            <button class="option-btn" data-value="15х21" data-price="25">15х21</button>
-                            <button class="option-btn" data-value="21х30" data-price="45">21х30</button>
-                            <button class="option-btn" data-value="30х42" data-price="95">30х42</button>
+                            <span class="loading-text">Загрузка...</span>
                         </div>
-                        <p class="purchase-option custom-size-label"><strong>Нестандартный размер:</strong></p>
+                    </div>
+
+                    <!-- Нестандартный размер -->
+                    <div class="option-group">
+                        <p class="purchase-option"><strong>Нестандартный размер:</strong></p>
                         <div class="custom-size">
                             <input type="number" id="custom-width" placeholder="Ширина" min="1" max="42">
                             <span class="custom-size-separator">×</span>
@@ -59,16 +60,16 @@
                             <span>см</span>
                         </div>
                     </div>
+
+                    <!-- Бумага -->
                     <div class="option-group">
-                        <p class="purchase-option"><strong>Бумага:</strong> <span id="paper-display">Глянец</span></p>
+                        <p class="purchase-option"><strong>Бумага:</strong> <span id="paper-display">—</span></p>
                         <div class="option-buttons" id="paper-buttons">
-                            <button class="option-btn active" data-value="Глянец" data-coefficient="1.0">Глянец</button>
-                            <button class="option-btn" data-value="Матовая" data-coefficient="1.0">Матовая</button>
-                            <button class="option-btn" data-value="Шелк" data-coefficient="1.2">Шелк</button>
-                            <button class="option-btn" data-value="Сатин" data-coefficient="1.3">Сатин</button>
-                            <button class="option-btn" data-value="Лён" data-coefficient="1.5">Лён</button>
+                            <span class="loading-text">Загрузка...</span>
                         </div>
                     </div>
+
+                    <!-- Режим -->
                     <div class="option-group">
                         <p class="purchase-option"><strong>Режим:</strong> <span id="mode-display">Детальный</span></p>
                         <div class="option-buttons" id="mode-buttons">
@@ -76,7 +77,8 @@
                             <button class="option-btn" data-value="Экспресс">Экспресс</button>
                         </div>
                     </div>
-                    <div class="purchase-price">Цена: <span id="price-display">50</span> руб.</div>
+
+                    <div class="purchase-price">Цена: <span id="price-display">—</span> руб.</div>
                     <a href="/frontend/print-app/" class="btn btn-order">Заказать</a>
                     <hr class="divider">
                     <details class="accordion">
@@ -95,7 +97,6 @@
     </section>
 
     <div id="recommendations-container"></div>
-    <!-- Уникальный текст для этой страницы -->
     <hr class="divider content-width">
     <section class="text-content">
         <p>На этой странице вы можете заказать стандартные фотографии в различных размерах и на разной бумаге.</p>
@@ -105,5 +106,11 @@
     <div id="footer-common-container"></div>
     
     <script src="script.js"></script>
+    <script src="product-config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initProductPage('prints');
+        });
+    </script>
 </body>
 </html>
