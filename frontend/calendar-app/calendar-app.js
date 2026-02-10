@@ -52,6 +52,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initModals();
     initZoom();
     initFileUpload();
+    initRulers();
     loadUrlParams();
     renderCurrentPage();
     renderCalendarGrid();
@@ -227,13 +228,14 @@ function initZoom() {
 function updateZoom() {
     const canvas = document.getElementById('canvas');
     const zoomValue = document.getElementById('zoom-value');
-    
+
     if (canvas) {
         canvas.style.transform = `scale(${CalendarState.zoom / 100})`;
     }
     if (zoomValue) {
         zoomValue.textContent = `${CalendarState.zoom}%`;
     }
+    requestAnimationFrame(renderRulers);
 }
 
 // ==================== FILE UPLOAD ====================
@@ -545,6 +547,66 @@ document.getElementById('calendar-year')?.addEventListener('change', (e) => {
 document.getElementById('start-month')?.addEventListener('change', (e) => {
     CalendarState.startMonth = parseInt(e.target.value);
 });
+
+// ==================== RULERS ====================
+function initRulers() {
+    requestAnimationFrame(renderRulers);
+
+    const canvasWrapper = document.getElementById('canvas-wrapper');
+    canvasWrapper?.addEventListener('scroll', renderRulers);
+    window.addEventListener('resize', renderRulers);
+}
+
+function renderRulers() {
+    const canvasPage = document.getElementById('canvas-page');
+    const rulerH = document.getElementById('ruler-h');
+    const rulerV = document.getElementById('ruler-v');
+
+    if (!canvasPage || !rulerH || !rulerV) return;
+
+    const PAGE_WIDTH_CM = 30;
+    const PAGE_HEIGHT_CM = 42;
+
+    const pageRect = canvasPage.getBoundingClientRect();
+    const rulerHRect = rulerH.getBoundingClientRect();
+    const rulerVRect = rulerV.getBoundingClientRect();
+
+    const pxPerCmH = pageRect.width / PAGE_WIDTH_CM;
+    const pxPerCmV = pageRect.height / PAGE_HEIGHT_CM;
+
+    const hStartX = pageRect.left - rulerHRect.left;
+    const vStartY = pageRect.top - rulerVRect.top;
+
+    // Horizontal ruler
+    let hHTML = '';
+    for (let cm = 0; cm <= PAGE_WIDTH_CM; cm++) {
+        const x = hStartX + cm * pxPerCmH;
+        if (x < -10 || x > rulerHRect.width + 10) continue;
+
+        const isMajor = cm % 5 === 0;
+        hHTML += `<div class="ruler-mark ruler-mark-h${isMajor ? ' major' : ''}" style="left:${x.toFixed(1)}px">`;
+        if (isMajor) {
+            hHTML += `<span class="ruler-num">${cm}</span>`;
+        }
+        hHTML += '</div>';
+    }
+    rulerH.innerHTML = hHTML;
+
+    // Vertical ruler
+    let vHTML = '';
+    for (let cm = 0; cm <= PAGE_HEIGHT_CM; cm++) {
+        const y = vStartY + cm * pxPerCmV;
+        if (y < -10 || y > rulerVRect.height + 10) continue;
+
+        const isMajor = cm % 5 === 0;
+        vHTML += `<div class="ruler-mark ruler-mark-v${isMajor ? ' major' : ''}" style="top:${y.toFixed(1)}px">`;
+        if (isMajor) {
+            vHTML += `<span class="ruler-num">${cm}</span>`;
+        }
+        vHTML += '</div>';
+    }
+    rulerV.innerHTML = vHTML;
+}
 
 // ==================== CSS STYLES FOR CALENDAR GRID ====================
 const gridStyles = document.createElement('style');
