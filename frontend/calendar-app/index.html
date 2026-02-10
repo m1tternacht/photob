@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Календарь - Выбор стиля - Photobond</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="calendar-app.css">
+</head>
+<body>
+    <div class="overlay" id="overlay"></div>
+    
+    <!-- Шапка -->
+    <header class="cal-header">
+        <a href="../index.html" class="cal-logo">
+            <img src="../images/logo.svg" alt="Фотобонд">
+        </a>
+        <div class="cal-header-right">
+            <span class="cal-user">Привет, <span id="user-name">Гость</span></span>
+        </div>
+    </header>
+
+    <!-- Контент выбора стиля -->
+    <main class="style-selection">
+        <h1 class="style-selection-title">Выберите стиль вашего календаря</h1>
+        
+        <div class="style-grid" id="style-grid">
+            <!-- Создать свой -->
+            <div class="style-card style-card-custom" data-style="custom">
+                <div class="style-preview">
+                    <span class="style-plus">+</span>
+                </div>
+                <div class="style-name">Создать свой</div>
+            </div>
+            
+            <!-- Стили загружаются с API -->
+            <div class="style-card" data-style="style1">
+                <div class="style-preview"></div>
+                <div class="style-name">Стиль 1</div>
+            </div>
+            <div class="style-card" data-style="style2">
+                <div class="style-preview"></div>
+                <div class="style-name">Стиль 2</div>
+            </div>
+            <div class="style-card" data-style="style3">
+                <div class="style-preview"></div>
+                <div class="style-name">Стиль 3</div>
+            </div>
+            <div class="style-card" data-style="style4">
+                <div class="style-preview"></div>
+                <div class="style-name">Стиль 4</div>
+            </div>
+            <div class="style-card" data-style="style5">
+                <div class="style-preview"></div>
+                <div class="style-name">Стиль 5</div>
+            </div>
+            <div class="style-card" data-style="style6">
+                <div class="style-preview"></div>
+                <div class="style-name">Стиль 6</div>
+            </div>
+        </div>
+    </main>
+
+    <script src="../script.js"></script>
+    <script>
+        // Переход к редактору при выборе стиля
+        document.querySelectorAll('.style-card').forEach(card => {
+            card.addEventListener('click', () => {
+                const style = card.dataset.style;
+                window.location.href = `editor.html?style=${style}`;
+            });
+        });
+        
+        // Auth check
+        async function checkAuth() {
+            const token = localStorage.getItem('access');
+            const userName = document.getElementById('user-name');
+            if (!token) {
+                if (userName) userName.textContent = 'Гость';
+                return;
+            }
+            try {
+                const res = await fetch('http://127.0.0.1:8000/api/auth/me/', {
+                    headers: { 'Authorization': 'Bearer ' + token }
+                });
+                if (res.ok) {
+                    const user = await res.json();
+                    if (userName) userName.textContent = user.username;
+                }
+            } catch (e) {}
+        }
+        checkAuth();
+    </script>
+</body>
+</html>

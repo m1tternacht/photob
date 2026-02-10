@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Редактор календаря - Photobond</title>
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="calendar-app.css">
+</head>
+<body class="calendar-editor-body">
+    
+    <!-- Верхняя шапка -->
+    <header class="editor-header">
+        <a href="../index.html" class="cal-logo">
+            <img src="../images/logo.svg" alt="Фотобонд">
+        </a>
+        
+        <div class="editor-header-center">
+            <span class="project-label">Название:</span>
+            <input type="text" class="project-name-input" id="project-name" value="Календарь">
+        </div>
+        
+        <div class="editor-header-right">
+            <button class="btn-preview" id="btn-preview">Предпросмотр</button>
+            <button class="btn-order" id="btn-order">Заказать за <span id="price">1500</span>р.</button>
+        </div>
+    </header>
+
+    <!-- Основная область -->
+    <div class="editor-main">
+        <!-- Узкая левая колонка с табами -->
+        <nav class="sidebar-tabs">
+            <button class="sidebar-tab active" data-panel="photos">Фото</button>
+            <button class="sidebar-tab" data-panel="style">Стиль</button>
+            <button class="sidebar-tab" data-panel="holidays">Праздники</button>
+            <button class="sidebar-tab" data-panel="grids">Сетки</button>
+            <button class="sidebar-tab" data-panel="text">Текст</button>
+            <button class="sidebar-tab" data-panel="backgrounds">Фоны</button>
+            <button class="sidebar-tab" data-panel="masks">Маски</button>
+            <button class="sidebar-tab" data-panel="shapes">Формы</button>
+            <button class="sidebar-tab" data-panel="stickers">Стикеры</button>
+            <button class="sidebar-tab" data-panel="settings">Настройки</button>
+        </nav>
+        
+        <!-- Панели контента -->
+        <div class="sidebar-panels">
+            <!-- Фото -->
+            <div class="sidebar-panel active" id="panel-photos">
+                <h3 class="panel-title">Фото</h3>
+                <button class="btn-action" id="btn-autofill">Автозаполнение</button>
+                <button class="btn-secondary" id="btn-clear-all">Удалить все</button>
+                <button class="btn-secondary" id="btn-clear-unused">Удалить неиспользуемые</button>
+                
+                <div class="panel-section">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="show-all-photos" checked>
+                        <span>Показать всё</span>
+                    </label>
+                    <div class="view-switcher">
+                        <button class="view-btn active" data-view="large">▪▪</button>
+                        <button class="view-btn" data-view="medium">▪▪▪</button>
+                        <button class="view-btn" data-view="small">▪▪▪▪</button>
+                    </div>
+                </div>
+                
+                <div class="panel-section">
+                    <select class="panel-select" id="photos-sort">
+                        <option value="new">Новое</option>
+                        <option value="old">Старое</option>
+                        <option value="name">По имени</option>
+                    </select>
+                </div>
+                
+                <div class="photos-grid" id="photos-grid"></div>
+                
+                <div class="panel-footer">
+                    <span class="photos-count"><span id="photos-count">0</span> фото</span>
+                    <button class="btn-action" id="btn-upload-photos">Загрузить</button>
+                </div>
+            </div>
+
+            <!-- Стиль -->
+            <div class="sidebar-panel" id="panel-style">
+                <h3 class="panel-title">Стиль</h3>
+                <div class="styles-list" id="styles-list"></div>
+            </div>
+
+            <!-- Праздники -->
+            <div class="sidebar-panel" id="panel-holidays">
+                <h3 class="panel-title">Праздники</h3>
+                <button class="btn-action" id="btn-add-holiday">Добавить праздник</button>
+                <div class="holidays-list" id="holidays-list"></div>
+            </div>
+
+            <!-- Сетки -->
+            <div class="sidebar-panel" id="panel-grids">
+                <h3 class="panel-title">Сетки</h3>
+                <div class="grids-list" id="grids-list"></div>
+            </div>
+
+            <!-- Текст -->
+            <div class="sidebar-panel" id="panel-text">
+                <h3 class="panel-title">Текст</h3>
+                <div class="text-presets">
+                    <button class="text-preset" data-size="large">T Большой</button>
+                    <button class="text-preset" data-size="medium">T Средний</button>
+                    <button class="text-preset" data-size="small">T Маленький</button>
+                </div>
+            </div>
+
+            <!-- Фоны -->
+            <div class="sidebar-panel" id="panel-backgrounds">
+                <h3 class="panel-title">Фоны</h3>
+                <div class="color-presets">
+                    <button class="color-btn" data-color="#000000" style="background:#000"></button>
+                    <button class="color-btn" data-color="#ffffff" style="background:#fff"></button>
+                    <button class="color-btn" data-color="#e3f2fd" style="background:#e3f2fd"></button>
+                    <button class="color-btn" data-color="#fce4ec" style="background:#fce4ec"></button>
+                    <button class="color-btn" data-color="#fff9c4" style="background:#fff9c4"></button>
+                </div>
+                <div class="panel-section">
+                    <select class="panel-select" id="bg-sort"><option value="new">Новое</option></select>
+                </div>
+                <div class="backgrounds-grid" id="backgrounds-grid"></div>
+            </div>
+
+            <!-- Маски -->
+            <div class="sidebar-panel" id="panel-masks">
+                <h3 class="panel-title">Маски</h3>
+                <div class="panel-section">
+                    <select class="panel-select" id="masks-sort"><option value="new">Новое</option></select>
+                </div>
+                <div class="masks-grid" id="masks-grid"></div>
+            </div>
+
+            <!-- Формы -->
+            <div class="sidebar-panel" id="panel-shapes">
+                <h3 class="panel-title">Формы</h3>
+                <div class="shapes-grid" id="shapes-grid"></div>
+            </div>
+
+            <!-- Стикеры -->
+            <div class="sidebar-panel" id="panel-stickers">
+                <h3 class="panel-title">Стикеры</h3>
+                <div class="panel-section">
+                    <input type="text" class="panel-search" id="stickers-search" placeholder="Search All Stickers">
+                </div>
+                <div class="panel-section">
+                    <select class="panel-select" id="stickers-category"><option value="all">All Assets</option></select>
+                    <span class="items-count" id="stickers-count">0</span>
+                </div>
+                <div class="stickers-grid" id="stickers-grid"></div>
+            </div>
+
+            <!-- Настройки -->
+            <div class="sidebar-panel" id="panel-settings">
+                <h3 class="panel-title">Настройки</h3>
+                <div class="settings-info">
+                    <div class="settings-id">id ********</div>
+                    <div class="settings-format">календарь 30×42</div>
+                </div>
+                
+                <div class="settings-group">
+                    <label class="settings-label">Начальный месяц</label>
+                    <select class="panel-select" id="start-month">
+                        <option value="1">Январь</option>
+                        <option value="2">Февраль</option>
+                        <option value="3">Март</option>
+                        <option value="4">Апрель</option>
+                        <option value="5">Май</option>
+                        <option value="6">Июнь</option>
+                        <option value="7">Июль</option>
+                        <option value="8">Август</option>
+                        <option value="9">Сентябрь</option>
+                        <option value="10">Октябрь</option>
+                        <option value="11">Ноябрь</option>
+                        <option value="12">Декабрь</option>
+                    </select>
+                </div>
+                
+                <div class="settings-group">
+                    <label class="settings-label">Год</label>
+                    <select class="panel-select" id="calendar-year">
+                        <option value="2025">2025</option>
+                        <option value="2026" selected>2026</option>
+                        <option value="2027">2027</option>
+                    </select>
+                </div>
+                
+                <div class="settings-group">
+                    <label class="settings-label">Стилизация</label>
+                    <details class="settings-accordion">
+                        <summary>Стилизация событий</summary>
+                        <div class="accordion-content"></div>
+                    </details>
+                    <details class="settings-accordion">
+                        <summary>Стилизация месяцев</summary>
+                        <div class="accordion-content"></div>
+                    </details>
+                    <details class="settings-accordion">
+                        <summary>Стилизация недель</summary>
+                        <div class="accordion-content"></div>
+                    </details>
+                    <details class="settings-accordion">
+                        <summary>Стилизация дней</summary>
+                        <div class="accordion-content"></div>
+                    </details>
+                </div>
+            </div>
+        </div>
+
+        <!-- Правая часть (toolbar + workspace) -->
+        <div class="editor-right">
+            <!-- Панель инструментов -->
+            <div class="editor-toolbar">
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="btn-undo">отмена</button>
+                    <button class="toolbar-btn" id="btn-redo">вперед</button>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="btn-cut">вырезать</button>
+                    <button class="toolbar-btn" id="btn-copy">копировать</button>
+                    <button class="toolbar-btn" id="btn-paste">вставить</button>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="btn-group">группа</button>
+                    <button class="toolbar-btn" id="btn-select-all">выделить все</button>
+                    <button class="toolbar-btn" id="btn-delete">удалить</button>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-group">
+                    <button class="toolbar-btn" id="btn-position">позиция</button>
+                    <button class="toolbar-btn" id="btn-align">выравнивание</button>
+                </div>
+                <div class="toolbar-separator"></div>
+                <div class="toolbar-group">
+                    <label class="toolbar-checkbox">
+                        <input type="checkbox" id="snap-enabled" checked>
+                        <span>Привязка</span>
+                    </label>
+                </div>
+                <div class="toolbar-spacer"></div>
+                <div class="toolbar-group">
+                    <span class="toolbar-saved" id="save-status">✓ Сохранено</span>
+                </div>
+            </div>
+
+            <!-- Рабочая область -->
+            <div class="editor-workspace">
+                <div class="canvas-container">
+                    <!-- Горизонтальная линейка -->
+                    <div class="ruler ruler-horizontal" id="ruler-h"></div>
+                    
+                    <!-- Табы месяцев -->
+                    <div class="month-tabs">
+                        <button class="month-tab active" data-month="cover">Обложка</button>
+                        <button class="month-tab" data-month="1">Янв.</button>
+                        <button class="month-tab" data-month="2">Фев.</button>
+                        <button class="month-tab" data-month="3">Март</button>
+                        <button class="month-tab" data-month="4">Апр.</button>
+                        <button class="month-tab" data-month="5">Май</button>
+                        <button class="month-tab" data-month="6">Июнь</button>
+                        <button class="month-tab" data-month="7">Июль</button>
+                        <button class="month-tab" data-month="8">Авг.</button>
+                        <button class="month-tab" data-month="9">Сен.</button>
+                        <button class="month-tab" data-month="10">Окт.</button>
+                        <button class="month-tab" data-month="11">Ноя.</button>
+                        <button class="month-tab" data-month="12">Дек.</button>
+                    </div>
+                    
+                    <!-- Вертикальная линейка -->
+                    <div class="ruler ruler-vertical" id="ruler-v"></div>
+                    
+                    <!-- Канва -->
+                    <div class="canvas-wrapper" id="canvas-wrapper">
+                        <div class="canvas" id="canvas">
+                            <div class="canvas-page" id="canvas-page">
+                                <div class="page-photo-area" id="photo-area">
+                                    <span class="placeholder-text">Перетащите фото сюда</span>
+                                </div>
+                                <div class="page-grid-area" id="grid-area"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Зум -->
+                    <div class="zoom-controls">
+                        <button class="zoom-btn" id="zoom-out">−</button>
+                        <span class="zoom-value" id="zoom-value">100%</span>
+                        <button class="zoom-btn" id="zoom-in">+</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно загрузки фото -->
+    <div class="modal" id="upload-modal">
+        <div class="modal-content modal-upload">
+            <button class="modal-close" id="upload-modal-close">×</button>
+            <h2 class="modal-title">Добавьте фото для вашего календаря</h2>
+            <div class="upload-sources">
+                <div class="upload-source" id="upload-local">
+                    <div class="upload-icon">📤</div>
+                    <div class="upload-label">Загрузить</div>
+                </div>
+                <div class="upload-source" id="upload-gallery">
+                    <div class="upload-icon">🖼️</div>
+                    <div class="upload-label">Галерея</div>
+                </div>
+                <div class="upload-source" id="upload-yandex">
+                    <div class="upload-icon">💾</div>
+                    <div class="upload-label">yandex.disk</div>
+                </div>
+                <div class="upload-source" id="upload-mail">
+                    <div class="upload-icon">☁️</div>
+                    <div class="upload-label">mail.cloud</div>
+                </div>
+            </div>
+            <p class="upload-hint">*Максимальный размер файла не более 200Mb</p>
+            <button class="btn-action btn-continue" id="btn-upload-continue">Продолжить</button>
+        </div>
+    </div>
+    
+    <input type="file" id="file-input" multiple accept="image/*" style="display:none">
+
+    <!-- Модальное окно автозаполнения -->
+    <div class="modal" id="autofill-modal">
+        <div class="modal-content modal-autofill">
+            <button class="modal-close" id="autofill-modal-close">×</button>
+            <h2 class="modal-title">Автозаполнение</h2>
+            <div class="autofill-section">
+                <label class="autofill-label">Расположение</label>
+                <div class="autofill-options">
+                    <div class="autofill-option active" data-layout="single">
+                        <div class="autofill-preview single"></div>
+                        <div class="autofill-name">Одно фото</div>
+                        <div class="autofill-count">12 штук</div>
+                    </div>
+                    <div class="autofill-option" data-layout="several">
+                        <div class="autofill-preview several"></div>
+                        <div class="autofill-name">Несколько</div>
+                        <div class="autofill-count">24-72 штуки</div>
+                    </div>
+                    <div class="autofill-option" data-layout="many">
+                        <div class="autofill-preview many"></div>
+                        <div class="autofill-name">Много</div>
+                        <div class="autofill-count">72-144 штуки</div>
+                    </div>
+                </div>
+            </div>
+            <div class="autofill-section">
+                <label class="autofill-label">Порядок автозаполнения</label>
+                <select class="panel-select" id="autofill-order">
+                    <option value="new">Новое</option>
+                    <option value="old">Старое</option>
+                    <option value="random">Случайный</option>
+                </select>
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="autofill-cancel">Отмена</button>
+                <button class="btn-action" id="autofill-apply">Применить</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно добавления праздника -->
+    <div class="modal" id="holiday-modal">
+        <div class="modal-content modal-holiday">
+            <button class="modal-close" id="holiday-modal-close">×</button>
+            <h2 class="modal-title">Добавить праздник</h2>
+            <div class="form-group">
+                <label>Дата</label>
+                <input type="date" class="form-input" id="holiday-date">
+            </div>
+            <div class="form-group">
+                <label>Название</label>
+                <input type="text" class="form-input" id="holiday-name" placeholder="День рождения">
+            </div>
+            <div class="modal-buttons">
+                <button class="btn-secondary" id="holiday-cancel">Отмена</button>
+                <button class="btn-action" id="holiday-save">Сохранить</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="calendar-app.js"></script>
+</body>
+</html>
