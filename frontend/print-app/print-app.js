@@ -13,7 +13,9 @@ const AppState = {
     projectName: 'Проект печати',
     totalPrice: 0,
     fullImageWarningShown: false, // показано ли предупреждение о полях
-    sortOrder: 'asc' // 'asc' или 'desc'
+    sortOrder: 'asc', // 'asc' или 'desc'
+    defaultSize: null, // размер из URL-параметров (со standard-photos.html)
+    defaultPaper: null
 };
 
 // Стандартные соотношения сторон для печати
@@ -114,6 +116,55 @@ async function loadPrintOptions() {
             { value: 'matte', label: 'Матовая', coefficient: 1.0 }
         ];
     }
+
+    // Применяем параметры из URL (размер/бумага со страницы standard-photos.html)
+    applyUrlParams();
+}
+
+// Читаем URL-параметры и добавляем кастомный размер в AppState.sizes если нужно
+function applyUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    const size = params.get('size');
+    const paper = params.get('paper');
+    const isCustom = params.get('custom') === '1';
+    const customPrice = parseFloat(params.get('price'));
+
+    if (size && isCustom) {
+        const [w, h] = size.split('x').map(Number);
+        if (w > 0 && h > 0) {
+            // Добавляем только если такого размера ещё нет в стандартных
+            const exists = AppState.sizes.some(s => {
+                const [sw, sh] = s.value.split('x').map(Number);
+                return (sw === w && sh === h) || (sw === h && sh === w);
+            });
+            if (!exists) {
+                const price = customPrice || Math.round(w * h * 0.1);
+                AppState.sizes.unshift({
+                    value: size,
+                    label: `${w} × ${h} см (нестанд.)`,
+                    price: price,
+                    ratio: Math.max(w, h) / Math.min(w, h)
+                });
+            }
+        }
+    }
+
+    if (size) {
+        AppState.defaultSize = size;
+    }
+    if (paper) {
+        AppState.defaultPaper = paper;
+    }
+}
+
+// Поиск данных размера с учётом ориентации (10x15 и 15x10 — один размер)
+function findSizeData(sizeValue) {
+    let data = AppState.sizes.find(s => s.value === sizeValue);
+    if (data) return data;
+
+    // Пробуем перевёрнутый вариант
+    const [a, b] = sizeValue.split('x').map(Number);
+    return AppState.sizes.find(s => s.value === `${b}x${a}`);
 }
 
 // ==================== API HELPERS ====================
@@ -419,7 +470,7 @@ async function handleFileUpload(files) {
 
 function getDefaultSettings(orientation) {
     // Выбираем размер в соответствии с ориентацией фото
-    const defaultSize = AppState.sizes[0]?.value || '10x15';
+    const defaultSize = AppState.defaultSize || AppState.sizes[0]?.value || '10x15';
     const [a, b] = defaultSize.split('x').map(Number);
     
     let size;
@@ -436,7 +487,7 @@ function getDefaultSettings(orientation) {
     
     return {
         size: size,
-        paper: AppState.papers[0]?.value || 'глянец',
+        paper: AppState.defaultPaper || AppState.papers[0]?.value || 'глянец',
         frame: 'none',
         frameSize: 3,
         quantity: 1,
@@ -458,9 +509,9 @@ function updatePhotosCount() {
 
 function updateTotalPrice() {
     let total = 0;
-    
+
     AppState.photos.forEach(photo => {
-        const sizeData = AppState.sizes.find(s => s.value === photo.settings.size);
+        const sizeData = findSizeData(photo.settings.size);
         const paperData = AppState.papers.find(p => p.value === photo.settings.paper);
         
         const basePrice = sizeData?.price || 15;
@@ -606,7 +657,7 @@ function renderSettingsPage() {
     if (!list) return;
     
     list.innerHTML = AppState.photos.map((photo, index) => {
-        const sizeData = AppState.sizes.find(s => s.value === photo.settings.size);
+        const sizeData = findSizeData(photo.settings.size);
         const paperData = AppState.papers.find(p => p.value === photo.settings.paper);
         
         const basePrice = sizeData?.price || 15;
@@ -631,9 +682,12 @@ function renderSettingsPage() {
                     <div class="setting-group">
                         <label>Размер</label>
                         <select class="setting-size" data-id="${photo.id}">
-                            ${AppState.sizes.map(s => `
-                                <option value="${s.value}" ${s.value === photo.settings.size ? 'selected' : ''}>${s.label}</option>
-                            `).join('')}
+                            ${AppState.sizes.map(s => {
+                                const [sa, sb] = s.value.split('x').map(Number);
+                                const [pa, pb] = photo.settings.size.split('x').map(Number);
+                                const match = (sa === pa && sb === pb) || (sa === pb && sb === pa);
+                                return `<option value="${s.value}" ${match ? 'selected' : ''}>${s.label}</option>`;
+                            }).join('')}
                         </select>
                     </div>
                     <div class="setting-group">
@@ -1159,9 +1213,12 @@ function renderEditor() {
     
     // Размеры в селекте
     const sizeSelect = document.getElementById('editor-size');
-    sizeSelect.innerHTML = AppState.sizes.map(s => `
-        <option value="${s.value}" ${s.value === photo.settings.size ? 'selected' : ''}>${s.label}</option>
-    `).join('');
+    sizeSelect.innerHTML = AppState.sizes.map(s => {
+        const [sa, sb] = s.value.split('x').map(Number);
+        const [pa, pb] = photo.settings.size.split('x').map(Number);
+        const match = (sa === pa && sb === pb) || (sa === pb && sb === pa);
+        return `<option value="${s.value}" ${match ? 'selected' : ''}>${s.label}</option>`;
+    }).join('');
     
     // Зум
     document.getElementById('editor-zoom').value = photo.settings.crop.zoom;

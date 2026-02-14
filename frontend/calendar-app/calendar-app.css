@@ -283,10 +283,12 @@
 .ruler {
     background: var(--bg-white);
     flex-shrink: 0;
+    position: relative;
+    overflow: hidden;
 }
 
 .ruler-horizontal {
-    height: 20px;
+    height: 24px;
     border-bottom: 1px solid var(--border);
     margin-left: 20px;
 }
@@ -294,7 +296,7 @@
 .ruler-vertical {
     position: absolute;
     left: 0;
-    top: 60px;
+    top: 0;
     bottom: 0;
     width: 20px;
     border-right: 1px solid var(--border);
@@ -302,11 +304,62 @@
     z-index: 5;
 }
 
+/* Ruler marks */
+.ruler-mark {
+    position: absolute;
+}
+
+.ruler-mark-h {
+    bottom: 0;
+    border-left: 1px solid #bbb;
+    height: 5px;
+}
+
+.ruler-mark-h.major {
+    height: 13px;
+    border-color: #999;
+}
+
+.ruler-mark-h .ruler-num {
+    position: absolute;
+    top: -13px;
+    left: 3px;
+    font-size: 9px;
+    line-height: 1;
+    color: #888;
+    pointer-events: none;
+    user-select: none;
+}
+
+.ruler-mark-v {
+    right: 0;
+    border-top: 1px solid #bbb;
+    width: 5px;
+}
+
+.ruler-mark-v.major {
+    width: 13px;
+    border-color: #999;
+}
+
+.ruler-mark-v .ruler-num {
+    position: absolute;
+    top: 3px;
+    left: 0;
+    font-size: 8px;
+    line-height: 1;
+    color: #888;
+    pointer-events: none;
+    user-select: none;
+    white-space: nowrap;
+}
+
 /* ===== MONTH TABS ===== */
 .month-tabs {
     display: flex;
+    justify-content: center;
     background: var(--bg-gray);
-    padding: 10px 15px 0 40px;
+    padding: 10px 20px 0 40px;
     flex-shrink: 0;
 }
 

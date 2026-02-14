@@ -11,7 +11,8 @@ let ProductState = {
     selectedSize: null,
     selectedPaper: null,
     basePrice: 0,
-    paperCoefficient: 1.0
+    paperCoefficient: 1.0,
+    isCustomSize: false
 };
 
 // Инициализация страницы продукта
@@ -24,6 +25,7 @@ async function initProductPage(productType) {
         renderPaperButtons();
         initOptionButtons();
         updatePrice();
+        updateOrderLink();
     } catch (e) {
         console.error('Failed to init product page:', e);
         // Fallback - показываем ошибку
@@ -120,17 +122,25 @@ function initOptionButtons() {
     document.getElementById('size-buttons')?.addEventListener('click', (e) => {
         const btn = e.target.closest('.option-btn');
         if (!btn) return;
-        
+
         // Убираем active у всех
         btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
-        
+
         // Обновляем состояние
         ProductState.selectedSize = btn.dataset.value;
         ProductState.basePrice = parseFloat(btn.dataset.price);
+        ProductState.isCustomSize = false;
         document.getElementById('size-display').textContent = btn.dataset.name || btn.dataset.value;
-        
+
+        // Очищаем кастомные инпуты
+        const cw = document.getElementById('custom-width');
+        const ch = document.getElementById('custom-height');
+        if (cw) cw.value = '';
+        if (ch) ch.value = '';
+
         updatePrice();
+        updateOrderLink();
     });
     
     // Бумага
@@ -144,8 +154,9 @@ function initOptionButtons() {
         ProductState.selectedPaper = btn.dataset.value;
         ProductState.paperCoefficient = parseFloat(btn.dataset.coefficient);
         document.getElementById('paper-display').textContent = btn.dataset.name || btn.dataset.value;
-        
+
         updatePrice();
+        updateOrderLink();
     });
     
     // Режим (статический, без API)
@@ -178,9 +189,11 @@ function initOptionButtons() {
                 const pricePerCm2 = 0.1; // 10 копеек за см² (настраивается)
                 ProductState.basePrice = Math.round(area * pricePerCm2);
                 ProductState.selectedSize = `${w}x${h}`;
-                
+                ProductState.isCustomSize = true;
+
                 document.getElementById('size-display').textContent = `${w}×${h} (нестанд.)`;
                 updatePrice();
+                updateOrderLink();
             }
         };
         
@@ -193,6 +206,26 @@ function initOptionButtons() {
 function updatePrice() {
     const price = Math.round(ProductState.basePrice * ProductState.paperCoefficient);
     document.getElementById('price-display').textContent = price;
+}
+
+// Обновление ссылки "Заказать" с параметрами выбранного размера
+function updateOrderLink() {
+    const link = document.getElementById('btn-order-link');
+    if (!link) return;
+
+    const params = new URLSearchParams();
+    if (ProductState.selectedSize) {
+        params.set('size', ProductState.selectedSize);
+    }
+    if (ProductState.selectedPaper) {
+        params.set('paper', ProductState.selectedPaper);
+    }
+    if (ProductState.isCustomSize) {
+        params.set('custom', '1');
+        params.set('price', ProductState.basePrice);
+    }
+
+    link.href = `/frontend/print-app/?${params.toString()}`;
 }
 
 // Экспорт для использования в других скриптах
