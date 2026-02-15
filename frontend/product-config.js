@@ -112,7 +112,8 @@ function renderPaperButtons() {
         const first = ProductState.papers[0];
         ProductState.selectedPaper = first.code;
         ProductState.paperCoefficient = parseFloat(first.coefficient);
-        document.getElementById('paper-display').textContent = first.name;
+        const paperDisplay = document.getElementById('paper-display');
+        if (paperDisplay) paperDisplay.textContent = first.name;
     }
 }
 
@@ -208,6 +209,13 @@ function updatePrice() {
     document.getElementById('price-display').textContent = price;
 }
 
+// Маршруты приложений для каждого типа продукта
+const PRODUCT_APP_ROUTES = {
+    'prints': '/frontend/print-app/',
+    'canvas': '/frontend/canvas-app/',
+    'polaroid': '/frontend/polaroid-app/'
+};
+
 // Обновление ссылки "Заказать" с параметрами выбранного размера
 function updateOrderLink() {
     const link = document.getElementById('btn-order-link');
@@ -225,7 +233,9 @@ function updateOrderLink() {
         params.set('price', ProductState.basePrice);
     }
 
-    link.href = `/frontend/print-app/?${params.toString()}`;
+    const basePath = PRODUCT_APP_ROUTES[ProductState.productType] || '/frontend/print-app/';
+    const queryString = params.toString();
+    link.href = queryString ? `${basePath}?${queryString}` : basePath;
 }
 
 // Экспорт для использования в других скриптах

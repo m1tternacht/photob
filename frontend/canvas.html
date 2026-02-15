@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Печать на холсте - Printique</title>
+    <title>Печать на холсте - Photobond</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -42,37 +42,16 @@
             <div class="content-right">
                 <h2 class="purchase-title">Печать на холсте</h2>
                 <div class="purchase-options">
+                    <!-- Размер -->
                     <div class="option-group">
-                        <p class="purchase-option"><strong>Размер:</strong> <span id="size-display">30х40</span></p>
+                        <p class="purchase-option"><strong>Размер:</strong> <span id="size-display">—</span></p>
                         <div class="option-buttons" id="size-buttons">
-                            <button class="option-btn active" data-value="30х40">30х40</button>
-                            <button class="option-btn" data-value="40х60">40х60</button>
-                            <button class="option-btn" data-value="50х70">50х70</button>
-                            <button class="option-btn" data-value="60х90">60х90</button>
-                            <button class="option-btn" data-value="30х30">30х30</button>
-                            <button class="option-btn" data-value="40х40">40х40</button>
-                            <button class="option-btn" data-value="50х50">50х50</button>
-                            <button class="option-btn" data-value="60х60">60х60</button>
-                            <button class="option-btn" data-value="70х70">70х70</button>
-                            <button class="option-btn" data-value="90х90">90х90</button>
-                        </div>
-                        <p class="purchase-option custom-size-label"><strong>Нестандартный размер:</strong></p>
-                        <div class="custom-size">
-                            <input type="number" id="custom-width" placeholder="Ширина" min="1" max="90">
-                            <span class="custom-size-separator">×</span>
-                            <input type="number" id="custom-height" placeholder="Высота" min="1" max="90">
-                            <span>см</span>
+                            <span class="loading-text">Загрузка...</span>
                         </div>
                     </div>
-                    <div class="option-group">
-                        <p class="purchase-option"><strong>Режим:</strong> <span id="mode-display">Детальный</span></p>
-                        <div class="option-buttons" id="mode-buttons">
-                            <button class="option-btn active" data-value="Детальный">Детальный</button>
-                            <button class="option-btn" data-value="Экспресс">Экспресс</button>
-                        </div>
-                    </div>
-                    <div class="purchase-price">Цена: <span id="price-display">1200</span> руб.</div>
-                    <button class="btn btn-order">Заказать</button>
+
+                    <div class="purchase-price">Цена: <span id="price-display">—</span> руб.</div>
+                    <a href="/frontend/canvas-app/" class="btn btn-order" id="btn-order-link">Заказать</a>
                     <hr class="divider">
                     <details class="accordion">
                         <summary>Описание</summary>
@@ -90,7 +69,6 @@
     </section>
 
     <div id="recommendations-container"></div>
-    <!-- Уникальный текст для этой страницы -->
     <hr class="divider content-width">
     <section class="text-content">
         <p>На этой странице вы можете заказать печать ваших фотографий на холсте в различных размерах.</p>
@@ -98,7 +76,13 @@
     </section>
 
     <div id="footer-common-container"></div>
-    
+
     <script src="script.js"></script>
+    <script src="product-config.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            initProductPage('canvas');
+        });
+    </script>
 </body>
 </html>
