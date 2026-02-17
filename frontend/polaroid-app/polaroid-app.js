@@ -4,14 +4,12 @@
 const API_URL = 'http://127.0.0.1:8000/api';
 
 // Polaroid frame specifications (all measurements in mm)
-const POLAROID_SPECS = {
-    '9x16': { outerW: 90, outerH: 160, photoW: 79, photoH: 115, padTop: 5.5, padLeft: 5.5, padRight: 5.5, padBottom: 39.5 },
-    '12x15': { outerW: 120, outerH: 150, photoW: 110, photoH: 120, padTop: 5.5, padLeft: 5.0, padRight: 5.0, padBottom: 24.5 },
-    '7.5x13': { outerW: 75, outerH: 130, photoW: 64, photoH: 100, padTop: 5.5, padLeft: 5.5, padRight: 5.0, padBottom: 24.5 },
-    '8.8x10.7': { outerW: 88, outerH: 107, photoW: 79, photoH: 79, padTop: 5.5, padLeft: 4.5, padRight: 4.5, padBottom: 22.5 },
-    '7x10': { outerW: 70, outerH: 100, photoW: 59, photoH: 72, padTop: 5.5, padLeft: 5.5, padRight: 5.0, padBottom: 22.5 },
-    '6x9': { outerW: 60, outerH: 90, photoW: 53, photoH: 65, padTop: 5.5, padLeft: 3.5, padRight: 3.5, padBottom: 19.0 },
-    '5.5x7.5': { outerW: 55, outerH: 75, photoW: 45, photoH: 45, padTop: 5.5, padLeft: 5.0, padRight: 5.0, padBottom: 24.5 }
+// Динамическое вычисление: 5.5мм сверху/слева/справа, 20% высоты снизу
+const POLAROID_FRAME_PADDING = {
+    top: 5.5,    // мм
+    left: 5.5,   // мм
+    right: 5.5,  // мм
+    bottomPercent: 0.20  // 20% от высоты внешней рамки
 };
 
 // Состояние приложения
@@ -24,7 +22,9 @@ const AppState = {
     projectName: 'Проект полароид-печати',
     totalPrice: 0,
     fullImageWarningShown: false, // показано ли предупреждение о полях
-    sortOrder: 'asc' // 'asc' или 'desc'
+    sortOrder: 'asc', // 'asc' или 'desc'
+    defaultSize: null, // размер из URL-параметров (со страницы polaroid-print.html)
+    defaultPaper: null
 };
 
 // Инициализация
@@ -68,35 +68,93 @@ async function checkAuth() {
 
 // ==================== POLAROID SPEC HELPERS ====================
 
-// Get polaroid spec for a given size value.
-// Handles both portrait (e.g. "9x16") and landscape (e.g. "16x9") orientations.
+// Нормализует строку размера: русская "х" → латинская "x", запятые → точки
+function normalizeSize(sizeValue) {
+    if (!sizeValue || typeof sizeValue !== 'string') return sizeValue;
+    return sizeValue.replace(/х/g, 'x').replace(/,/g, '.');
+}
+
+// Парсит размер и возвращает {w, h} или null если не удалось
+function parseSize(sizeValue) {
+    const normalized = normalizeSize(sizeValue);
+    if (!normalized) return null;
+    
+    const parts = normalized.split('x');
+    if (parts.length !== 2) return null;
+    
+    const w = parseFloat(parts[0]);
+    const h = parseFloat(parts[1]);
+    
+    if (isNaN(w) || isNaN(h)) return null;
+    
+    return { w, h };
+}
+
+// Форматирует размер с учётом ориентации фото.
+// Возвращает размер в формате "ШxВ" где Ш и В корректно расположены для ориентации.
+// Если парсинг не удался - возвращает исходное значение.
+function formatSizeForOrientation(sizeValue, orientation) {
+    const parsed = parseSize(sizeValue);
+    if (!parsed) return sizeValue;
+    
+    const { w, h } = parsed;
+    const smaller = Math.min(w, h);
+    const larger = Math.max(w, h);
+    
+    if (orientation === 'landscape') {
+        // Горизонтальное фото - большее число первым (ширина > высота)
+        return `${larger}x${smaller}`;
+    } else if (orientation === 'portrait') {
+        // Вертикальное фото - меньшее число первым (ширина < высота)
+        return `${smaller}x${larger}`;
+    }
+    // Квадратное или неизвестное - возвращаем нормализованное значение
+    return normalizeSize(sizeValue);
+}
+
+// Динамически вычисляет спецификацию рамки полароида для любого размера.
+// Размер в формате "ШИРИНАxВЫСОТА" (в см), например "9x16" = 90мм x 160мм
+// Рамка: 5.5мм сверху/слева/справа, 20% высоты снизу
 function getPolaroidSpec(sizeValue) {
-    // Direct lookup
-    if (POLAROID_SPECS[sizeValue]) {
-        return POLAROID_SPECS[sizeValue];
+    const parsed = parseSize(sizeValue);
+    if (!parsed) return null;
+
+    const { w: widthCm, h: heightCm } = parsed;
+
+    if (widthCm <= 0 || heightCm <= 0) {
+        return null;
     }
 
-    // Try reversed (landscape) lookup: "16x9" -> look up "9x16" and swap dimensions
-    const parts = sizeValue.split('x');
-    const a = parseFloat(parts[0]);
-    const b = parseFloat(parts[1]);
-    const reversed = `${b}x${a}`;
+    // Конвертируем см в мм
+    const outerW = widthCm * 10;
+    const outerH = heightCm * 10;
 
-    if (POLAROID_SPECS[reversed]) {
-        const spec = POLAROID_SPECS[reversed];
-        return {
-            outerW: spec.outerH,
-            outerH: spec.outerW,
-            photoW: spec.photoH,
-            photoH: spec.photoW,
-            padTop: spec.padLeft,
-            padLeft: spec.padTop,
-            padRight: spec.padBottom,
-            padBottom: spec.padRight
-        };
+    // Паддинги по правилам: 5.5мм сверху/слева/справа, 20% высоты снизу
+    const padTop = POLAROID_FRAME_PADDING.top;
+    const padLeft = POLAROID_FRAME_PADDING.left;
+    const padRight = POLAROID_FRAME_PADDING.right;
+    const padBottom = outerH * POLAROID_FRAME_PADDING.bottomPercent;
+
+    // Область фото = внешний размер минус паддинги
+    const photoW = outerW - padLeft - padRight;
+    const photoH = outerH - padTop - padBottom;
+
+    // Проверяем что область фото не отрицательная
+    if (photoW <= 0 || photoH <= 0) {
+        console.warn(`Invalid polaroid spec for size ${sizeValue}: photo area is negative`);
+        return null;
     }
 
-    return null;
+    return {
+        outerW,
+        outerH,
+        photoW,
+        photoH,
+        padTop,
+        padLeft,
+        padRight,
+        padBottom
+    };
 }
 
 // ==================== LOAD PRINT OPTIONS ====================
@@ -108,17 +166,20 @@ async function loadPrintOptions() {
 
         const config = await res.json();
 
-        // Парсим размеры
+        // Парсим размеры - используем width_cm и height_cm из API
         if (config.sizes && config.sizes.length > 0) {
             AppState.sizes = config.sizes.map(s => {
-                const parts = s.code.split('x');
-                const w = parseFloat(parts[0]);
-                const h = parseFloat(parts[1]);
+                const w = parseFloat(s.width_cm);
+                const h = parseFloat(s.height_cm);
+                // Формируем code из width_cm x height_cm если нужно
+                const code = `${w}x${h}`;
                 return {
-                    value: s.code,
+                    value: code,
                     label: s.name,
                     price: parseFloat(s.price),
-                    ratio: Math.max(w, h) / Math.min(w, h)
+                    width: w,
+                    height: h,
+                    ratio: (isNaN(w) || isNaN(h)) ? 1 : Math.max(w, h) / Math.min(w, h)
                 };
             });
         }
@@ -137,38 +198,81 @@ async function loadPrintOptions() {
 
     } catch (e) {
         console.error('Failed to load polaroid options from API:', e);
-        // Fallback - дефолтные значения из POLAROID_SPECS
+        // Fallback - дефолтные значения размеров
         AppState.sizes = [
-            { value: '9x16', label: '9 x 16 см', price: 30, ratio: 160 / 90 },
-            { value: '12x15', label: '12 x 15 см', price: 35, ratio: 150 / 120 },
-            { value: '7.5x13', label: '7.5 x 13 см', price: 25, ratio: 130 / 75 },
-            { value: '8.8x10.7', label: '8.8 x 10.7 см', price: 28, ratio: 107 / 88 },
-            { value: '7x10', label: '7 x 10 см', price: 20, ratio: 100 / 70 },
-            { value: '6x9', label: '6 x 9 см', price: 18, ratio: 90 / 60 },
-            { value: '5.5x7.5', label: '5.5 x 7.5 см', price: 15, ratio: 75 / 55 }
+            { value: '9x16', label: '9 x 16 см', price: 30, width: 9, height: 16, ratio: 16 / 9 },
+            { value: '12x15', label: '12 x 15 см', price: 35, width: 12, height: 15, ratio: 15 / 12 },
+            { value: '7.5x13', label: '7.5 x 13 см', price: 25, width: 7.5, height: 13, ratio: 13 / 7.5 },
+            { value: '8.8x10.7', label: '8.8 x 10.7 см', price: 28, width: 8.8, height: 10.7, ratio: 10.7 / 8.8 },
+            { value: '7x10', label: '7 x 10 см', price: 20, width: 7, height: 10, ratio: 10 / 7 },
+            { value: '6x9', label: '6 x 9 см', price: 18, width: 6, height: 9, ratio: 9 / 6 },
+            { value: '5.5x7.5', label: '5.5 x 7.5 см', price: 15, width: 5.5, height: 7.5, ratio: 7.5 / 5.5 }
         ];
         AppState.papers = [
             { value: 'glossy', label: 'Глянцевая', coefficient: 1.0 },
             { value: 'matte', label: 'Матовая', coefficient: 1.0 }
         ];
     }
+
+    // Применяем параметры из URL (размер/бумага со страницы polaroid-print.html)
+    applyUrlParams();
+}
+
+// Читаем URL-параметры и сохраняем выбранный размер/бумагу
+function applyUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    const size = params.get('size');
+    const paper = params.get('paper');
+
+    if (size) {
+        // Ищем размер в загруженных
+        const sizeData = AppState.sizes.find(s => {
+            const parts = size.split('x');
+            if (parts.length !== 2) return false;
+            const w = parseFloat(parts[0]);
+            const h = parseFloat(parts[1]);
+            return (Math.abs(s.width - w) < 0.01 && Math.abs(s.height - h) < 0.01) ||
+                   (Math.abs(s.width - h) < 0.01 && Math.abs(s.height - w) < 0.01);
+        });
+        if (sizeData) {
+            AppState.defaultSize = sizeData.value;
+        }
+    }
+
+    if (paper) {
+        const paperData = AppState.papers.find(p => p.value === paper);
+        if (paperData) {
+            AppState.defaultPaper = paper;
+        }
+    }
+
+    console.log('URL params applied:', { defaultSize: AppState.defaultSize, defaultPaper: AppState.defaultPaper });
 }
 
 // Поиск данных размера с учётом ориентации (9x16 и 16x9 — один размер)
-// Handles decimal-based size codes like "7.5x13" and "8.8x10.7"
 function findSizeData(sizeValue) {
+    if (!sizeValue) return null;
+    
+    // Пробуем прямое совпадение
     let data = AppState.sizes.find(s => s.value === sizeValue);
     if (data) return data;
 
-    // Пробуем перевёрнутый вариант
+    // Парсим входной размер
     const parts = sizeValue.split('x');
+    if (parts.length !== 2) return null;
+    
     const a = parseFloat(parts[0]);
     const b = parseFloat(parts[1]);
+    
+    if (isNaN(a) || isNaN(b)) return null;
+    
+    // Ищем по width/height с учётом ориентации
     return AppState.sizes.find(s => {
-        const sp = s.value.split('x');
-        const sa = parseFloat(sp[0]);
-        const sb = parseFloat(sp[1]);
-        return (Math.abs(sa - b) < 0.01 && Math.abs(sb - a) < 0.01);
+        const sw = s.width;
+        const sh = s.height;
+        // Сравниваем оба варианта ориентации
+        return (Math.abs(sw - a) < 0.01 && Math.abs(sh - b) < 0.01) ||
+               (Math.abs(sw - b) < 0.01 && Math.abs(sh - a) < 0.01);
     });
 }
 
@@ -338,27 +442,27 @@ function getOrientation(width, height) {
 }
 
 function getSizeRatio(sizeValue) {
-    const parts = sizeValue.split('x');
-    const w = parseFloat(parts[0]);
-    const h = parseFloat(parts[1]);
     // For polaroid, the ratio is based on the photo area, not the outer frame
     const spec = getPolaroidSpec(sizeValue);
     if (spec) {
         return Math.max(spec.photoW, spec.photoH) / Math.min(spec.photoW, spec.photoH);
     }
-    return Math.max(w, h) / Math.min(w, h);
+    const parsed = parseSize(sizeValue);
+    if (!parsed) return 1;
+    return Math.max(parsed.w, parsed.h) / Math.min(parsed.w, parsed.h);
 }
 
 function getSizeDimensions(sizeValue, photoOrientation) {
-    const parts = sizeValue.split('x');
-    const a = parseFloat(parts[0]);
-    const b = parseFloat(parts[1]);
+    const parsed = parseSize(sizeValue);
+    if (!parsed) return { width: 0, height: 0 };
+    
+    const { w, h } = parsed;
     // Если фото горизонтальное, большая сторона - ширина
     if (photoOrientation === 'landscape') {
-        return { width: Math.max(a, b), height: Math.min(a, b) };
+        return { width: Math.max(w, h), height: Math.min(w, h) };
     }
     // Если вертикальное - большая сторона - высота
-    return { width: Math.min(a, b), height: Math.max(a, b) };
+    return { width: Math.min(w, h), height: Math.max(w, h) };
 }
 
 function getPhotoAreaRatio(sizeValue) {
@@ -367,10 +471,9 @@ function getPhotoAreaRatio(sizeValue) {
     if (spec) {
         return spec.photoW / spec.photoH;
     }
-    const parts = sizeValue.split('x');
-    const a = parseFloat(parts[0]);
-    const b = parseFloat(parts[1]);
-    return a / b;
+    const parsed = parseSize(sizeValue);
+    if (!parsed) return 1;
+    return parsed.w / parsed.h;
 }
 
 function checkAspectRatioMatch(photoRatio, sizeValue, tolerance = 0.05) {
@@ -495,27 +598,13 @@ async function handleFileUpload(files) {
 }
 
 function getDefaultSettings(orientation) {
-    // Выбираем размер в соответствии с ориентацией фото
-    const defaultSize = AppState.sizes[0]?.value || '9x16';
-    const parts = defaultSize.split('x');
-    const a = parseFloat(parts[0]);
-    const b = parseFloat(parts[1]);
-
-    let size;
-    if (orientation === 'landscape') {
-        // Горизонтальное фото - большее число первым
-        size = `${Math.max(a, b)}x${Math.min(a, b)}`;
-    } else if (orientation === 'portrait') {
-        // Вертикальное фото - меньшее число первым
-        size = `${Math.min(a, b)}x${Math.max(a, b)}`;
-    } else {
-        // Квадратное - как есть
-        size = defaultSize;
-    }
+    // Выбираем размер: сначала из URL-параметров, потом первый из списка
+    const defaultSize = AppState.defaultSize || AppState.sizes[0]?.value || '9x16';
+    const size = formatSizeForOrientation(defaultSize, orientation);
 
     return {
         size: size,
-        paper: AppState.papers[0]?.value || 'glossy',
+        paper: AppState.defaultPaper || AppState.papers[0]?.value || 'glossy',
         quantity: 1,
         crop: { x: 0, y: 0, zoom: 100 },
         rotation: 0,
@@ -690,10 +779,23 @@ function renderSettingsPage() {
         const coefficient = paperData?.coefficient || 1.0;
         const price = Math.round(basePrice * coefficient * photo.settings.quantity);
 
-        // Размеры для отображения берём напрямую из size
-        const sizeParts = photo.settings.size.split('x');
-        const sizeWidth = parseFloat(sizeParts[0]);
-        const sizeHeight = parseFloat(sizeParts[1]);
+        // Размеры для отображения берём из sizeData или парсим из size
+        let sizeWidth, sizeHeight;
+        if (sizeData && sizeData.width && sizeData.height) {
+            // Используем готовые данные из API
+            if (photo.orientation === 'landscape') {
+                sizeWidth = Math.max(sizeData.width, sizeData.height);
+                sizeHeight = Math.min(sizeData.width, sizeData.height);
+            } else {
+                sizeWidth = Math.min(sizeData.width, sizeData.height);
+                sizeHeight = Math.max(sizeData.width, sizeData.height);
+            }
+        } else {
+            // Fallback - парсим из строки
+            const parts = photo.settings.size.split('x');
+            sizeWidth = parseFloat(parts[0]) || 0;
+            sizeHeight = parseFloat(parts[1]) || 0;
+        }
 
         return `
         <div class="photo-settings-item" data-id="${photo.id}">
@@ -710,14 +812,11 @@ function renderSettingsPage() {
                         <label>Размер</label>
                         <select class="setting-size" data-id="${photo.id}">
                             ${AppState.sizes.map(s => {
-                                const sp = s.value.split('x');
-                                const sa = parseFloat(sp[0]);
-                                const sb = parseFloat(sp[1]);
-                                const pp = photo.settings.size.split('x');
-                                const pa = parseFloat(pp[0]);
-                                const pb = parseFloat(pp[1]);
-                                const match = (Math.abs(sa - pa) < 0.01 && Math.abs(sb - pb) < 0.01) ||
-                                              (Math.abs(sa - pb) < 0.01 && Math.abs(sb - pa) < 0.01);
+                                // Сравниваем по width/height с учётом ориентации
+                                const sw = s.width;
+                                const sh = s.height;
+                                const match = (Math.abs(sw - sizeWidth) < 0.01 && Math.abs(sh - sizeHeight) < 0.01) ||
+                                              (Math.abs(sw - sizeHeight) < 0.01 && Math.abs(sh - sizeWidth) < 0.01);
                                 return `<option value="${s.value}" ${match ? 'selected' : ''}>${s.label}</option>`;
                             }).join('')}
                         </select>
@@ -787,7 +886,14 @@ function renderSettingsPage() {
 function updatePhotoSetting(id, key, value) {
     const photo = AppState.photos.find(p => p.id === id);
     if (photo) {
-        photo.settings[key] = value;
+        if (key === 'size') {
+            // Форматируем размер с учётом ориентации фото
+            photo.settings.size = formatSizeForOrientation(value, photo.orientation);
+            // Сбрасываем crop при смене размера
+            photo.settings.crop = { x: 0, y: 0, zoom: 100 };
+        } else {
+            photo.settings[key] = value;
+        }
         updateTotalPrice();
     }
 }
@@ -802,24 +908,16 @@ function applySettingsFromPhoto(photoId) {
         quantity: photo.settings.quantity
     };
 
-    // Получаем базовый размер (без учёта ориентации)
-    const parts = photo.settings.size.split('x');
-    const a = parseFloat(parts[0]);
-    const b = parseFloat(parts[1]);
-    const baseWidth = Math.min(a, b);
-    const baseHeight = Math.max(a, b);
+    // Базовый размер для применения ко всем
+    const baseSize = photo.settings.size;
 
     AppState.photos.forEach(p => {
         // Применяем общие настройки
         p.settings.paper = settings.paper;
         p.settings.quantity = settings.quantity;
 
-        // Размер применяем с учётом ориентации фото
-        if (p.orientation === 'landscape') {
-            p.settings.size = `${baseHeight}x${baseWidth}`;
-        } else {
-            p.settings.size = `${baseWidth}x${baseHeight}`;
-        }
+        // Размер применяем с учётом ориентации каждого фото
+        p.settings.size = formatSizeForOrientation(baseSize, p.orientation);
     });
 
     renderSettingsPage();
@@ -1247,17 +1345,17 @@ function renderEditor() {
     document.getElementById('editor-total').textContent = AppState.photos.length;
     document.getElementById('editor-filename').textContent = photo.name;
 
-    // Размеры в селекте
+    // Размеры в селекте - находим текущий размер фото
     const sizeSelect = document.getElementById('editor-size');
+    const currentSizeData = findSizeData(photo.settings.size);
+    
     sizeSelect.innerHTML = AppState.sizes.map(s => {
-        const sp = s.value.split('x');
-        const sa = parseFloat(sp[0]);
-        const sb = parseFloat(sp[1]);
-        const pp = photo.settings.size.split('x');
-        const pa = parseFloat(pp[0]);
-        const pb = parseFloat(pp[1]);
-        const match = (Math.abs(sa - pa) < 0.01 && Math.abs(sb - pb) < 0.01) ||
-                      (Math.abs(sa - pb) < 0.01 && Math.abs(sb - pa) < 0.01);
+        // Сравниваем по width/height
+        let match = false;
+        if (currentSizeData) {
+            match = (Math.abs(s.width - currentSizeData.width) < 0.01 && 
+                     Math.abs(s.height - currentSizeData.height) < 0.01);
+        }
         return `<option value="${s.value}" ${match ? 'selected' : ''}>${s.label}</option>`;
     }).join('');
 
@@ -1302,9 +1400,9 @@ function renderEditorCanvas() {
         polaroidFrame.style.background = 'transparent';
         polaroidFrame.style.boxShadow = 'none';
 
-        const sizeParts = photo.settings.size.split('x');
-        const frameWidth = parseFloat(sizeParts[0]);
-        const frameHeight = parseFloat(sizeParts[1]);
+        const parsed = parseSize(photo.settings.size);
+        const frameWidth = parsed?.w || 10;
+        const frameHeight = parsed?.h || 10;
         const frameRatio = frameWidth / frameHeight;
 
         const canvasRect = canvas.getBoundingClientRect();
@@ -1471,7 +1569,9 @@ function updateEditorZoom(zoom) {
 function updateEditorSize(size) {
     const photo = AppState.photos[currentEditorPhotoIndex];
     if (photo) {
-        photo.settings.size = size;
+        // Форматируем размер с учётом ориентации фото
+        photo.settings.size = formatSizeForOrientation(size, photo.orientation);
+
         // Сбрасываем crop при смене размера
         photo.settings.crop = { x: 0, y: 0, zoom: 100 };
         document.getElementById('editor-zoom').value = 100;

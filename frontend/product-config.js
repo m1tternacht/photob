@@ -9,6 +9,8 @@ let ProductState = {
     sizes: [],
     papers: [],
     selectedSize: null,
+    selectedWidth: null,
+    selectedHeight: null,
     selectedPaper: null,
     basePrice: 0,
     paperCoefficient: 1.0,
@@ -68,7 +70,9 @@ function renderSizeButtons() {
         return `<button class="option-btn ${isActive}" 
                     data-value="${size.code}" 
                     data-price="${size.price}"
-                    data-name="${displayName}">
+                    data-name="${displayName}"
+                    data-width="${size.width_cm || ''}"
+                    data-height="${size.height_cm || ''}">
                     ${displayName}
                 </button>`;
     }).join('');
@@ -80,6 +84,8 @@ function renderSizeButtons() {
         const first = ProductState.sizes[0];
         ProductState.selectedSize = first.code;
         ProductState.basePrice = parseFloat(first.price);
+        ProductState.selectedWidth = first.width_cm;
+        ProductState.selectedHeight = first.height_cm;
         document.getElementById('size-display').textContent = first.name || first.code.replace('x', '×');
     }
 }
@@ -131,6 +137,8 @@ function initOptionButtons() {
         // Обновляем состояние
         ProductState.selectedSize = btn.dataset.value;
         ProductState.basePrice = parseFloat(btn.dataset.price);
+        ProductState.selectedWidth = btn.dataset.width ? parseFloat(btn.dataset.width) : null;
+        ProductState.selectedHeight = btn.dataset.height ? parseFloat(btn.dataset.height) : null;
         ProductState.isCustomSize = false;
         document.getElementById('size-display').textContent = btn.dataset.name || btn.dataset.value;
 
@@ -190,6 +198,8 @@ function initOptionButtons() {
                 const pricePerCm2 = 0.1; // 10 копеек за см² (настраивается)
                 ProductState.basePrice = Math.round(area * pricePerCm2);
                 ProductState.selectedSize = `${w}x${h}`;
+                ProductState.selectedWidth = w;
+                ProductState.selectedHeight = h;
                 ProductState.isCustomSize = true;
 
                 document.getElementById('size-display').textContent = `${w}×${h} (нестанд.)`;
@@ -222,9 +232,16 @@ function updateOrderLink() {
     if (!link) return;
 
     const params = new URLSearchParams();
+    
     if (ProductState.selectedSize) {
-        params.set('size', ProductState.selectedSize);
+        // Используем width_cm/height_cm если есть, иначе code
+        if (ProductState.selectedWidth && ProductState.selectedHeight) {
+            params.set('size', `${ProductState.selectedWidth}x${ProductState.selectedHeight}`);
+        } else {
+            params.set('size', ProductState.selectedSize);
+        }
     }
+    
     if (ProductState.selectedPaper) {
         params.set('paper', ProductState.selectedPaper);
     }

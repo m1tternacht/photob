@@ -81,15 +81,19 @@ async function loadPrintOptions() {
 
         const config = await res.json();
 
-        // Парсим размеры
+        // Парсим размеры - используем width_cm и height_cm из API
         if (config.sizes && config.sizes.length > 0) {
             AppState.sizes = config.sizes.map(s => {
-                const [w, h] = s.code.split('x').map(Number);
+                const w = parseFloat(s.width_cm);
+                const h = parseFloat(s.height_cm);
+                const code = `${w}x${h}`;
                 return {
-                    value: s.code,
+                    value: code,
                     label: s.name,
                     price: parseFloat(s.price),
-                    ratio: Math.max(w, h) / Math.min(w, h)
+                    width: w,
+                    height: h,
+                    ratio: (isNaN(w) || isNaN(h)) ? 1 : Math.max(w, h) / Math.min(w, h)
                 };
             });
         }
@@ -110,11 +114,11 @@ async function loadPrintOptions() {
         console.error('Failed to load canvas options from API:', e);
         // Fallback - дефолтные значения для холста
         AppState.sizes = [
-            { value: '30x40', label: '30 \u00d7 40 \u0441\u043c', price: 2500, ratio: 1.333 },
-            { value: '40x60', label: '40 \u00d7 60 \u0441\u043c', price: 3500, ratio: 1.5 },
-            { value: '50x70', label: '50 \u00d7 70 \u0441\u043c', price: 4500, ratio: 1.4 },
-            { value: '60x80', label: '60 \u00d7 80 \u0441\u043c', price: 5500, ratio: 1.333 },
-            { value: '60x90', label: '60 \u00d7 90 \u0441\u043c', price: 6500, ratio: 1.5 }
+            { value: '30x40', label: '30 × 40 см', price: 2500, width: 30, height: 40, ratio: 1.333 },
+            { value: '40x60', label: '40 × 60 см', price: 3500, width: 40, height: 60, ratio: 1.5 },
+            { value: '50x70', label: '50 × 70 см', price: 4500, width: 50, height: 70, ratio: 1.4 },
+            { value: '60x80', label: '60 × 80 см', price: 5500, width: 60, height: 80, ratio: 1.333 },
+            { value: '60x90', label: '60 × 90 см', price: 6500, width: 60, height: 90, ratio: 1.5 }
         ];
         AppState.papers = [
             { value: 'cotton', label: 'Хлопок', coefficient: 1.0 },
@@ -124,9 +128,16 @@ async function loadPrintOptions() {
 }
 
 // ==================== QUALITY CHECK ====================
-// Helper: parse size code like "30x40" into { width, height } in cm
+// Helper: get size dimensions from sizeData or parse from string
 function getSizeDimensionsCm(sizeValue) {
-    const [a, b] = sizeValue.split('x').map(Number);
+    const sizeData = findSizeData(sizeValue);
+    if (sizeData && sizeData.width && sizeData.height) {
+        return { width: sizeData.width, height: sizeData.height };
+    }
+    // Fallback - parse from string
+    const parts = sizeValue.split('x');
+    const a = parseFloat(parts[0]) || 0;
+    const b = parseFloat(parts[1]) || 0;
     return { width: a, height: b };
 }
 
@@ -157,12 +168,25 @@ function checkPhotoQuality(photo) {
 
 // Поиск данных размера с учётом ориентации (30x40 и 40x30 — один размер)
 function findSizeData(sizeValue) {
+    if (!sizeValue) return null;
+    
+    // Прямое совпадение
     let data = AppState.sizes.find(s => s.value === sizeValue);
     if (data) return data;
 
-    // Пробуем перевёрнутый вариант
-    const [a, b] = sizeValue.split('x').map(Number);
-    return AppState.sizes.find(s => s.value === `${b}x${a}`);
+    // Парсим входной размер
+    const parts = sizeValue.split('x');
+    if (parts.length !== 2) return null;
+    
+    const a = parseFloat(parts[0]);
+    const b = parseFloat(parts[1]);
+    if (isNaN(a) || isNaN(b)) return null;
+
+    // Ищем по width/height с учётом ориентации
+    return AppState.sizes.find(s => {
+        return (Math.abs(s.width - a) < 0.01 && Math.abs(s.height - b) < 0.01) ||
+               (Math.abs(s.width - b) < 0.01 && Math.abs(s.height - a) < 0.01);
+    });
 }
 
 // ==================== API HELPERS ====================
@@ -660,8 +684,21 @@ function renderSettingsPage() {
         const coefficient = paperData?.coefficient || 1.0;
         const price = Math.round(basePrice * coefficient * photo.settings.quantity);
 
-        // Размеры для отображения берём напрямую из size
-        const [sizeWidth, sizeHeight] = photo.settings.size.split('x').map(Number);
+        // Размеры для отображения берём из sizeData
+        let sizeWidth, sizeHeight;
+        if (sizeData && sizeData.width && sizeData.height) {
+            if (photo.orientation === 'landscape') {
+                sizeWidth = Math.max(sizeData.width, sizeData.height);
+                sizeHeight = Math.min(sizeData.width, sizeData.height);
+            } else {
+                sizeWidth = Math.min(sizeData.width, sizeData.height);
+                sizeHeight = Math.max(sizeData.width, sizeData.height);
+            }
+        } else {
+            const parts = photo.settings.size.split('x');
+            sizeWidth = parseFloat(parts[0]) || 0;
+            sizeHeight = parseFloat(parts[1]) || 0;
+        }
 
         // Quality check
         const quality = checkPhotoQuality(photo);
@@ -669,27 +706,26 @@ function renderSettingsPage() {
         return `
         <div class="photo-settings-item" data-id="${photo.id}">
             <div class="photo-settings-preview">
-                <span class="size-indicator">${sizeHeight} \u0441\u043c</span>
+                <span class="size-indicator">${sizeHeight} см</span>
                 <img src="${photo.url}" alt="${photo.name}" class="orientation-${photo.orientation}">
-                <span class="size-indicator-bottom">${sizeWidth} \u0441\u043c</span>
+                <span class="size-indicator-bottom">${sizeWidth} см</span>
             </div>
             <div class="photo-settings-details">
-                <div class="photo-settings-info">${index + 1} \u0438\u0437 ${AppState.photos.length} \u0444\u043e\u0442\u043e\u0433\u0440\u0430\u0444\u0438\u0439</div>
+                <div class="photo-settings-info">${index + 1} из ${AppState.photos.length} фотографий</div>
                 <div class="photo-settings-filename">${photo.name}</div>
                 <div class="photo-settings-options">
                     <div class="setting-group">
-                        <label>\u0420\u0430\u0437\u043c\u0435\u0440</label>
+                        <label>Размер</label>
                         <select class="setting-size" data-id="${photo.id}">
                             ${AppState.sizes.map(s => {
-                                const [sa, sb] = s.value.split('x').map(Number);
-                                const [pa, pb] = photo.settings.size.split('x').map(Number);
-                                const match = (sa === pa && sb === pb) || (sa === pb && sb === pa);
+                                const match = sizeData && 
+                                    (Math.abs(s.width - sizeData.width) < 0.01 && Math.abs(s.height - sizeData.height) < 0.01);
                                 return `<option value="${s.value}" ${match ? 'selected' : ''}>${s.label}</option>`;
                             }).join('')}
                         </select>
                     </div>
                     <div class="setting-group">
-                        <label>\u0422\u0438\u043f \u0445\u043e\u043b\u0441\u0442\u0430</label>
+                        <label>Тип холста</label>
                         <select class="setting-paper" data-id="${photo.id}">
                             ${AppState.papers.map(p => `
                                 <option value="${p.value}" ${p.value === photo.settings.paper ? 'selected' : ''}>${p.label}</option>
@@ -697,20 +733,20 @@ function renderSettingsPage() {
                         </select>
                     </div>
                     <div class="setting-group">
-                        <label>\u041a\u043e\u043b-\u0432\u043e</label>
+                        <label>Кол-во</label>
                         <input type="number" class="setting-quantity" data-id="${photo.id}"
                             value="${photo.settings.quantity}" min="1">
                     </div>
                     <div class="photo-settings-price">
-                        <label>\u0426\u0435\u043d\u0430</label>
-                        <span>${price} \u0440\u0443\u0431.</span>
+                        <label>Цена</label>
+                        <span>${price} руб.</span>
                     </div>
-                    <button class="photo-settings-delete" data-id="${photo.id}">\ud83d\uddd1\ufe0f</button>
+                    <button class="photo-settings-delete" data-id="${photo.id}">🗑️</button>
                 </div>
                 <div class="quality-indicator">
-                    <span class="quality-badge quality-${quality.level}">${quality.dpi} DPI \u2014 ${quality.level === 'good' ? '\u041e\u0442\u043b\u0438\u0447\u043d\u043e' : quality.level === 'warning' ? '\u041f\u0440\u0438\u0435\u043c\u043b\u0435\u043c\u043e' : '\u041d\u0438\u0437\u043a\u043e\u0435 \u043a\u0430\u0447\u0435\u0441\u0442\u0432\u043e'}</span>
+                    <span class="quality-badge quality-${quality.level}">${quality.dpi} DPI — ${quality.level === 'good' ? 'Отлично' : quality.level === 'warning' ? 'Приемлемо' : 'Низкое качество'}</span>
                 </div>
-                <button class="btn-apply-to-all" data-id="${photo.id}">\u041f\u0440\u0438\u043c\u0435\u043d\u0438\u0442\u044c \u043d\u0430\u0441\u0442\u0440\u043e\u0439\u043a\u0438 \u043a\u043e \u0432\u0441\u0435\u043c \u0444\u043e\u0442\u043e</button>
+                <button class="btn-apply-to-all" data-id="${photo.id}">Применить настройки ко всем фото</button>
             </div>
         </div>
         `;

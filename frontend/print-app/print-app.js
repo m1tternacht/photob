@@ -78,15 +78,19 @@ async function loadPrintOptions() {
         
         const config = await res.json();
         
-        // Парсим размеры
+        // Парсим размеры - используем width_cm и height_cm из API
         if (config.sizes && config.sizes.length > 0) {
             AppState.sizes = config.sizes.map(s => {
-                const [w, h] = s.code.split('x').map(Number);
+                const w = parseFloat(s.width_cm);
+                const h = parseFloat(s.height_cm);
+                const code = `${w}x${h}`;
                 return {
-                    value: s.code,
+                    value: code,
                     label: s.name,
                     price: parseFloat(s.price),
-                    ratio: Math.max(w, h) / Math.min(w, h)
+                    width: w,
+                    height: h,
+                    ratio: (isNaN(w) || isNaN(h)) ? 1 : Math.max(w, h) / Math.min(w, h)
                 };
             });
         }
@@ -107,9 +111,9 @@ async function loadPrintOptions() {
         console.error('Failed to load print options from API:', e);
         // Fallback - дефолтные значения
         AppState.sizes = [
-            { value: '10x15', label: '10 × 15 см', price: 15, ratio: 1.5 },
-            { value: '15x21', label: '15 × 21 см', price: 35, ratio: 1.4 },
-            { value: '21x30', label: '21 × 30 см', price: 60, ratio: 1.43 }
+            { value: '10x15', label: '10 × 15 см', price: 15, width: 10, height: 15, ratio: 1.5 },
+            { value: '15x21', label: '15 × 21 см', price: 35, width: 15, height: 21, ratio: 1.4 },
+            { value: '21x30', label: '21 × 30 см', price: 60, width: 21, height: 30, ratio: 1.43 }
         ];
         AppState.papers = [
             { value: 'glossy', label: 'Глянцевая', coefficient: 1.0 },
@@ -130,12 +134,14 @@ function applyUrlParams() {
     const customPrice = parseFloat(params.get('price'));
 
     if (size && isCustom) {
-        const [w, h] = size.split('x').map(Number);
-        if (w > 0 && h > 0) {
+        const parts = size.split('x');
+        const w = parseFloat(parts[0]);
+        const h = parseFloat(parts[1]);
+        if (w > 0 && h > 0 && !isNaN(w) && !isNaN(h)) {
             // Добавляем только если такого размера ещё нет в стандартных
             const exists = AppState.sizes.some(s => {
-                const [sw, sh] = s.value.split('x').map(Number);
-                return (sw === w && sh === h) || (sw === h && sh === w);
+                return (Math.abs(s.width - w) < 0.01 && Math.abs(s.height - h) < 0.01) ||
+                       (Math.abs(s.width - h) < 0.01 && Math.abs(s.height - w) < 0.01);
             });
             if (!exists) {
                 const price = customPrice || Math.round(w * h * 0.1);
@@ -143,6 +149,8 @@ function applyUrlParams() {
                     value: size,
                     label: `${w} × ${h} см (нестанд.)`,
                     price: price,
+                    width: w,
+                    height: h,
                     ratio: Math.max(w, h) / Math.min(w, h)
                 });
             }
@@ -159,12 +167,25 @@ function applyUrlParams() {
 
 // Поиск данных размера с учётом ориентации (10x15 и 15x10 — один размер)
 function findSizeData(sizeValue) {
+    if (!sizeValue) return null;
+    
+    // Прямое совпадение
     let data = AppState.sizes.find(s => s.value === sizeValue);
     if (data) return data;
 
-    // Пробуем перевёрнутый вариант
-    const [a, b] = sizeValue.split('x').map(Number);
-    return AppState.sizes.find(s => s.value === `${b}x${a}`);
+    // Парсим входной размер
+    const parts = sizeValue.split('x');
+    if (parts.length !== 2) return null;
+    
+    const a = parseFloat(parts[0]);
+    const b = parseFloat(parts[1]);
+    if (isNaN(a) || isNaN(b)) return null;
+
+    // Ищем по width/height с учётом ориентации
+    return AppState.sizes.find(s => {
+        return (Math.abs(s.width - a) < 0.01 && Math.abs(s.height - b) < 0.01) ||
+               (Math.abs(s.width - b) < 0.01 && Math.abs(s.height - a) < 0.01);
+    });
 }
 
 // ==================== API HELPERS ====================
@@ -664,9 +685,21 @@ function renderSettingsPage() {
         const coefficient = paperData?.coefficient || 1.0;
         const price = Math.round(basePrice * coefficient * photo.settings.quantity);
         
-        // Размеры для отображения берём напрямую из size
-        // size уже содержит правильный порядок: первое число - ширина, второе - высота
-        const [sizeWidth, sizeHeight] = photo.settings.size.split('x').map(Number);
+        // Размеры для отображения берём из sizeData
+        let sizeWidth, sizeHeight;
+        if (sizeData && sizeData.width && sizeData.height) {
+            if (photo.orientation === 'landscape') {
+                sizeWidth = Math.max(sizeData.width, sizeData.height);
+                sizeHeight = Math.min(sizeData.width, sizeData.height);
+            } else {
+                sizeWidth = Math.min(sizeData.width, sizeData.height);
+                sizeHeight = Math.max(sizeData.width, sizeData.height);
+            }
+        } else {
+            const parts = photo.settings.size.split('x');
+            sizeWidth = parseFloat(parts[0]) || 0;
+            sizeHeight = parseFloat(parts[1]) || 0;
+        }
         
         return `
         <div class="photo-settings-item" data-id="${photo.id}">
@@ -683,9 +716,8 @@ function renderSettingsPage() {
                         <label>Размер</label>
                         <select class="setting-size" data-id="${photo.id}">
                             ${AppState.sizes.map(s => {
-                                const [sa, sb] = s.value.split('x').map(Number);
-                                const [pa, pb] = photo.settings.size.split('x').map(Number);
-                                const match = (sa === pa && sb === pb) || (sa === pb && sb === pa);
+                                const match = sizeData && 
+                                    (Math.abs(s.width - sizeData.width) < 0.01 && Math.abs(s.height - sizeData.height) < 0.01);
                                 return `<option value="${s.value}" ${match ? 'selected' : ''}>${s.label}</option>`;
                             }).join('')}
                         </select>
