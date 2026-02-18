@@ -12,9 +12,17 @@ let ProductState = {
     selectedWidth: null,
     selectedHeight: null,
     selectedPaper: null,
+    selectedMode: 'Детальный',
+    modeCoefficient: 1.0,
     basePrice: 0,
     paperCoefficient: 1.0,
     isCustomSize: false
+};
+
+// Коэффициенты для режима печати
+const MODE_COEFFICIENTS = {
+    'Детальный': 1.0,
+    'Экспресс': 0.8
 };
 
 // Инициализация страницы продукта
@@ -168,7 +176,7 @@ function initOptionButtons() {
         updateOrderLink();
     });
     
-    // Режим (статический, без API)
+    // Режим (детальный/экспресс)
     document.getElementById('mode-buttons')?.addEventListener('click', (e) => {
         const btn = e.target.closest('.option-btn');
         if (!btn) return;
@@ -176,7 +184,12 @@ function initOptionButtons() {
         btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         
+        ProductState.selectedMode = btn.dataset.value;
+        ProductState.modeCoefficient = MODE_COEFFICIENTS[btn.dataset.value] || 1.0;
         document.getElementById('mode-display').textContent = btn.dataset.value;
+        
+        updatePrice();
+        updateOrderLink();
     });
     
     // Нестандартный размер
@@ -215,7 +228,7 @@ function initOptionButtons() {
 
 // Расчёт и обновление цены
 function updatePrice() {
-    const price = Math.round(ProductState.basePrice * ProductState.paperCoefficient);
+    const price = Math.round(ProductState.basePrice * ProductState.paperCoefficient * ProductState.modeCoefficient);
     document.getElementById('price-display').textContent = price;
 }
 
@@ -245,6 +258,11 @@ function updateOrderLink() {
     if (ProductState.selectedPaper) {
         params.set('paper', ProductState.selectedPaper);
     }
+    
+    if (ProductState.selectedMode && ProductState.selectedMode !== 'Детальный') {
+        params.set('mode', ProductState.selectedMode);
+    }
+    
     if (ProductState.isCustomSize) {
         params.set('custom', '1');
         params.set('price', ProductState.basePrice);

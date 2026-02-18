@@ -411,6 +411,12 @@ function goToStep(step) {
     const btnContinue = document.getElementById('btn-continue');
     btnContinue.textContent = step === 3 ? 'Заказать' : 'Продолжить';
 
+    // Скрываем кнопку "добавить" на шагах 2 и 3
+    const btnAddMore = document.getElementById('btn-add-more');
+    if (btnAddMore) {
+        btnAddMore.style.display = step === 1 ? '' : 'none';
+    }
+
     if (step === 2) {
         renderSettingsPage();
     } else if (step === 3) {
@@ -722,14 +728,6 @@ function renderSettingsPage() {
                                     (Math.abs(s.width - sizeData.width) < 0.01 && Math.abs(s.height - sizeData.height) < 0.01);
                                 return `<option value="${s.value}" ${match ? 'selected' : ''}>${s.label}</option>`;
                             }).join('')}
-                        </select>
-                    </div>
-                    <div class="setting-group">
-                        <label>Тип холста</label>
-                        <select class="setting-paper" data-id="${photo.id}">
-                            ${AppState.papers.map(p => `
-                                <option value="${p.value}" ${p.value === photo.settings.paper ? 'selected' : ''}>${p.label}</option>
-                            `).join('')}
                         </select>
                     </div>
                     <div class="setting-group">
@@ -1354,10 +1352,14 @@ function renderEditorCanvas() {
             cropFrame.classList.remove('with-padding');
             cropFrame.style.background = 'transparent';
 
+            // Центрируем изображение, затем применяем смещение пользователя
+            const centerOffsetX = (displayFrameWidth - imgWidth) / 2;
+            const centerOffsetY = (displayFrameHeight - imgHeight) / 2;
+
             img.style.width = `${imgWidth}px`;
             img.style.height = `${imgHeight}px`;
-            img.style.left = `${photo.settings.crop.x}px`;
-            img.style.top = `${photo.settings.crop.y}px`;
+            img.style.left = `${centerOffsetX + photo.settings.crop.x}px`;
+            img.style.top = `${centerOffsetY + photo.settings.crop.y}px`;
             img.style.transform = `rotate(${photo.settings.rotation}deg)`;
         }
 
