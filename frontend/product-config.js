@@ -9,10 +9,20 @@ let ProductState = {
     sizes: [],
     papers: [],
     selectedSize: null,
+    selectedWidth: null,
+    selectedHeight: null,
     selectedPaper: null,
+    selectedMode: 'Детальный',
+    modeCoefficient: 1.0,
     basePrice: 0,
     paperCoefficient: 1.0,
     isCustomSize: false
+};
+
+// Коэффициенты для режима печати
+const MODE_COEFFICIENTS = {
+    'Детальный': 1.0,
+    'Экспресс': 0.8
 };
 
 // Инициализация страницы продукта
@@ -68,7 +78,9 @@ function renderSizeButtons() {
         return `<button class="option-btn ${isActive}" 
                     data-value="${size.code}" 
                     data-price="${size.price}"
-                    data-name="${displayName}">
+                    data-name="${displayName}"
+                    data-width="${size.width_cm || ''}"
+                    data-height="${size.height_cm || ''}">
                     ${displayName}
                 </button>`;
     }).join('');
@@ -80,6 +92,8 @@ function renderSizeButtons() {
         const first = ProductState.sizes[0];
         ProductState.selectedSize = first.code;
         ProductState.basePrice = parseFloat(first.price);
+        ProductState.selectedWidth = first.width_cm;
+        ProductState.selectedHeight = first.height_cm;
         document.getElementById('size-display').textContent = first.name || first.code.replace('x', '×');
     }
 }
@@ -112,7 +126,8 @@ function renderPaperButtons() {
         const first = ProductState.papers[0];
         ProductState.selectedPaper = first.code;
         ProductState.paperCoefficient = parseFloat(first.coefficient);
-        document.getElementById('paper-display').textContent = first.name;
+        const paperDisplay = document.getElementById('paper-display');
+        if (paperDisplay) paperDisplay.textContent = first.name;
     }
 }
 
@@ -130,6 +145,8 @@ function initOptionButtons() {
         // Обновляем состояние
         ProductState.selectedSize = btn.dataset.value;
         ProductState.basePrice = parseFloat(btn.dataset.price);
+        ProductState.selectedWidth = btn.dataset.width ? parseFloat(btn.dataset.width) : null;
+        ProductState.selectedHeight = btn.dataset.height ? parseFloat(btn.dataset.height) : null;
         ProductState.isCustomSize = false;
         document.getElementById('size-display').textContent = btn.dataset.name || btn.dataset.value;
 
@@ -159,7 +176,7 @@ function initOptionButtons() {
         updateOrderLink();
     });
     
-    // Режим (статический, без API)
+    // Режим (детальный/экспресс)
     document.getElementById('mode-buttons')?.addEventListener('click', (e) => {
         const btn = e.target.closest('.option-btn');
         if (!btn) return;
@@ -167,7 +184,12 @@ function initOptionButtons() {
         btn.parentElement.querySelectorAll('.option-btn').forEach(b => b.classList.remove('active'));
         btn.classList.add('active');
         
+        ProductState.selectedMode = btn.dataset.value;
+        ProductState.modeCoefficient = MODE_COEFFICIENTS[btn.dataset.value] || 1.0;
         document.getElementById('mode-display').textContent = btn.dataset.value;
+        
+        updatePrice();
+        updateOrderLink();
     });
     
     // Нестандартный размер
@@ -189,6 +211,8 @@ function initOptionButtons() {
                 const pricePerCm2 = 0.1; // 10 копеек за см² (настраивается)
                 ProductState.basePrice = Math.round(area * pricePerCm2);
                 ProductState.selectedSize = `${w}x${h}`;
+                ProductState.selectedWidth = w;
+                ProductState.selectedHeight = h;
                 ProductState.isCustomSize = true;
 
                 document.getElementById('size-display').textContent = `${w}×${h} (нестанд.)`;
@@ -204,9 +228,16 @@ function initOptionButtons() {
 
 // Расчёт и обновление цены
 function updatePrice() {
-    const price = Math.round(ProductState.basePrice * ProductState.paperCoefficient);
+    const price = Math.round(ProductState.basePrice * ProductState.paperCoefficient * ProductState.modeCoefficient);
     document.getElementById('price-display').textContent = price;
 }
+
+// Маршруты приложений для каждого типа продукта
+const PRODUCT_APP_ROUTES = {
+    'prints': '/frontend/print-app/',
+    'canvas': '/frontend/canvas-app/',
+    'polaroid': '/frontend/polaroid-app/'
+};
 
 // Обновление ссылки "Заказать" с параметрами выбранного размера
 function updateOrderLink() {
@@ -214,18 +245,32 @@ function updateOrderLink() {
     if (!link) return;
 
     const params = new URLSearchParams();
+    
     if (ProductState.selectedSize) {
-        params.set('size', ProductState.selectedSize);
+        // Используем width_cm/height_cm если есть, иначе code
+        if (ProductState.selectedWidth && ProductState.selectedHeight) {
+            params.set('size', `${ProductState.selectedWidth}x${ProductState.selectedHeight}`);
+        } else {
+            params.set('size', ProductState.selectedSize);
+        }
     }
+    
     if (ProductState.selectedPaper) {
         params.set('paper', ProductState.selectedPaper);
     }
+    
+    if (ProductState.selectedMode && ProductState.selectedMode !== 'Детальный') {
+        params.set('mode', ProductState.selectedMode);
+    }
+    
     if (ProductState.isCustomSize) {
         params.set('custom', '1');
         params.set('price', ProductState.basePrice);
     }
 
-    link.href = `/frontend/print-app/?${params.toString()}`;
+    const basePath = PRODUCT_APP_ROUTES[ProductState.productType] || '/frontend/print-app/';
+    const queryString = params.toString();
+    link.href = queryString ? `${basePath}?${queryString}` : basePath;
 }
 
 // Экспорт для использования в других скриптах

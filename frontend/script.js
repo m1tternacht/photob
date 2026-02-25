@@ -50,7 +50,13 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     if (document.querySelector('.purchase-options')) {
-        initPurchaseOptions();
+        // Ждём загрузки других скриптов (product-config.js)
+        // Если он загружен - он сам управляет ценами
+        setTimeout(() => {
+            if (!window.initProductPage) {
+                initPurchaseOptions();
+            }
+        }, 0);
     }
 
     if (document.querySelector('.image-stack')) {
