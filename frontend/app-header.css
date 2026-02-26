@@ -1,0 +1,314 @@
+/* ==================== APP HEADER STYLES ==================== */
+/* Стили как на основном сайте */
+
+/* ---------- HEADER ---------- */
+.app-header {
+    background: #fff;
+    padding: clamp(10px, 2vw, 20px) 30px;
+    border-bottom: 1px solid #ccc;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    width: 100%;
+}
+
+.app-logo img {
+    display: block;
+    max-width: clamp(100px, 15vw, 150px);
+    width: 100%;
+    height: auto;
+}
+
+/* ---------- AUTH LINK ---------- */
+.app-user {
+    display: flex;
+    align-items: center;
+}
+
+.app-auth-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+    color: #333;
+    font-size: clamp(12px, 1.5vw, 14px);
+}
+
+.app-auth-link:hover {
+    color: #007674;
+}
+
+.app-auth-icon {
+    width: clamp(16px, 2vw, 24px);
+    height: auto;
+}
+
+.app-auth-text {
+    white-space: nowrap;
+}
+
+/* ---------- AUTH DROPDOWN ---------- */
+.app-auth-dropdown {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 30px;
+    background: #fff;
+    border: 1px solid #ccc;
+    padding: clamp(10px, 2vw, 20px);
+    width: 280px;
+    z-index: 1000;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+}
+
+.app-auth-dropdown.active {
+    display: block;
+}
+
+/* ---------- AUTH FORMS ---------- */
+.app-auth-form {
+    display: none;
+}
+
+.app-auth-form.active {
+    display: block;
+}
+
+.app-auth-form h3 {
+    font-size: clamp(14px, 2vw, 18px);
+    margin-bottom: clamp(10px, 2vw, 15px);
+    text-align: center;
+}
+
+.app-auth-form label {
+    display: block;
+    margin-bottom: clamp(5px, 1vw, 10px);
+    font-size: clamp(12px, 1.5vw, 14px);
+}
+
+.app-auth-form input {
+    width: 100%;
+    padding: clamp(5px, 1vw, 8px);
+    margin-top: 5px;
+    border: 1px solid #ccc;
+    font-size: clamp(12px, 1.5vw, 14px);
+}
+
+.app-auth-form input:focus {
+    outline: none;
+    border-color: #007674;
+}
+
+.app-btn {
+    width: 100%;
+    margin-top: clamp(10px, 2vw, 15px);
+    padding: 10px 20px;
+    background: #007674;
+    color: #fff;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.2s;
+}
+
+.app-btn:hover {
+    background: #005f5e;
+}
+
+.app-switch-text {
+    font-size: clamp(10px, 1.2vw, 12px);
+    color: #666;
+    margin-top: clamp(10px, 2vw, 15px);
+    text-align: center;
+}
+
+.app-switch-link {
+    color: #007674;
+    cursor: pointer;
+}
+
+.app-switch-link:hover {
+    color: #005f5e;
+    text-decoration: underline;
+}
+
+/* ---------- AUTH MESSAGE ---------- */
+.app-auth-message {
+    display: none;
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 10px;
+    margin-bottom: 15px;
+    font-size: 13px;
+    color: #856404;
+    border-radius: 4px;
+}
+
+.app-auth-message p {
+    margin: 0;
+}
+
+/* ---------- CLOSE BUTTON ---------- */
+.app-close-btn {
+    position: absolute;
+    top: clamp(5px, 1vw, 10px);
+    right: clamp(5px, 1vw, 10px);
+    background: none;
+    border: none;
+    padding: 5px;
+    cursor: pointer;
+    z-index: 25;
+}
+
+.app-close-icon {
+    width: 16px;
+    height: 16px;
+}
+
+/* ---------- USER MENU DROPDOWN ---------- */
+.app-user-menu-dropdown h3 {
+    font-size: 16px;
+    font-weight: 500;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #ccc;
+    color: #333;
+}
+
+.app-user-menu-nav {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.app-user-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    text-decoration: none;
+    color: #333;
+    font-size: 14px;
+    border-radius: 6px;
+    transition: background 0.2s;
+}
+
+.app-user-menu-item:hover {
+    background: #f5f5f5;
+}
+
+.app-user-menu-divider {
+    height: 1px;
+    background: #ccc;
+    margin: 10px 0;
+}
+
+.app-user-menu-logout {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 12px;
+    background: none;
+    border: none;
+    color: #e74c3c;
+    font-size: 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.app-user-menu-logout:hover {
+    background: #fef5f5;
+}
+
+/* ---------- RESPONSIVE ---------- */
+@media (max-width: 768px) {
+    .app-header {
+        padding: 10px 16px;
+    }
+    
+    .app-auth-dropdown {
+        right: 16px;
+        width: calc(100% - 32px);
+        max-width: 280px;
+    }
+}
+
+/* ---------- ORDER MODAL GUEST BLOCK ---------- */
+.order-guest-block {
+    margin-bottom: 15px;
+}
+
+.order-guest-message {
+    background: #fff3cd;
+    border: 1px solid #ffc107;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+}
+
+.order-guest-message p {
+    margin: 0;
+    font-size: 14px;
+    color: #856404;
+    line-height: 1.4;
+}
+
+.btn-login {
+    width: 100%;
+    padding: 12px 20px;
+    background: #007674;
+    color: #fff;
+    border: none;
+    font-size: 15px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.btn-login:hover {
+    background: #005f5e;
+}
+
+/* ---------- AUTH MODAL (for order) ---------- */
+.app-auth-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+}
+
+.app-auth-modal.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+.app-auth-modal-content {
+    background: #fff;
+    width: 100%;
+    max-width: 360px;
+    padding: clamp(20px, 4vw, 30px);
+    position: relative;
+    transform: scale(0.9);
+    transition: transform 0.3s ease;
+}
+
+.app-auth-modal.active .app-auth-modal-content {
+    transform: scale(1);
+}
+
+.app-auth-modal .app-close-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}

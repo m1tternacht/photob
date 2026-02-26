@@ -5,17 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Печать фотографий - Photobond</title>
     <link rel="stylesheet" href="print-app.css">
+    <link rel="stylesheet" href="/frontend/app-header.css">
 </head>
 <body>
     <!-- Шапка приложения -->
-    <header class="app-header">
-        <a href="/frontend/index.html" class="app-logo">
-            <img src="/frontend/images/logo_photobond.png" alt="Photobond">
-        </a>
-        <div class="app-user">
-            Привет, <span id="user-name">Гость</span>
-        </div>
-    </header>
+    <div id="app-header-container"></div>
 
     <!-- Навигация по шагам -->
     <nav class="steps-nav">
@@ -338,5 +332,6 @@
     </div>
 
     <script src="print-app.js"></script>
+    <script src="/frontend/app-header.js"></script>
 </body>
 </html>

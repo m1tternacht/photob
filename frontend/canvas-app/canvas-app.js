@@ -51,12 +51,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ==================== AUTH ====================
 async function checkAuth() {
+    // Авторизация теперь обрабатывается через AppHeader
+    // Эта функция оставлена для совместимости
     const token = localStorage.getItem('access');
-    const userName = document.getElementById('user-name');
-
     if (!token) {
-        if (userName) userName.textContent = 'Гость';
-        return;
+        return null;
     }
 
     try {
@@ -64,12 +63,12 @@ async function checkAuth() {
             headers: { 'Authorization': 'Bearer ' + token }
         });
         if (res.ok) {
-            const user = await res.json();
-            if (userName) userName.textContent = user.username;
+            return await res.json();
         }
     } catch (e) {
         console.error('Auth check failed:', e);
     }
+    return null;
 }
 
 // ==================== LOAD PRINT OPTIONS ====================
@@ -1022,31 +1021,45 @@ function renderPreviewPhoto(photo) {
     let imgWidth, imgHeight, imgLeft, imgTop;
 
     if (photo.settings.fullImage) {
-        // Вписываем целиком с полями
+        // Вписываем целиком с полями, но учитываем zoom и crop
+        let baseWidth, baseHeight;
         if (imgRatio > frameRatio) {
-            imgWidth = frameWidth;
-            imgHeight = frameWidth / imgRatio;
+            baseWidth = frameWidth;
+            baseHeight = baseWidth / imgRatio;
         } else {
-            imgHeight = frameHeight;
-            imgWidth = frameHeight * imgRatio;
+            baseHeight = frameHeight;
+            baseWidth = baseHeight * imgRatio;
         }
-        // Центрируем
-        imgLeft = (frameWidth - imgWidth) / 2;
-        imgTop = (frameHeight - imgHeight) / 2;
-    } else {
-        // Заполняем с обрезкой
-        if (imgRatio > frameRatio) {
-            imgHeight = frameHeight * zoom;
-            imgWidth = imgHeight * imgRatio;
-        } else {
-            imgWidth = frameWidth * zoom;
-            imgHeight = imgWidth / imgRatio;
-        }
-        // Применяем смещение пропорционально размеру рамки
+        // Применяем zoom
+        imgWidth = baseWidth * zoom;
+        imgHeight = baseHeight * zoom;
+        // Центрируем и применяем crop offset
+        const centerX = (frameWidth - imgWidth) / 2;
+        const centerY = (frameHeight - imgHeight) / 2;
         const editorFrameWidth = photo.settings.editorFrameWidth || 400;
         const scale = frameWidth / editorFrameWidth;
-        imgLeft = photo.settings.crop.x * scale;
-        imgTop = photo.settings.crop.y * scale;
+        imgLeft = centerX + photo.settings.crop.x * scale;
+        imgTop = centerY + photo.settings.crop.y * scale;
+    } else {
+        // Заполняем с обрезкой
+        let baseWidth, baseHeight;
+        if (imgRatio > frameRatio) {
+            baseHeight = frameHeight;
+            baseWidth = baseHeight * imgRatio;
+        } else {
+            baseWidth = frameWidth;
+            baseHeight = baseWidth / imgRatio;
+        }
+        // Применяем zoom
+        imgWidth = baseWidth * zoom;
+        imgHeight = baseHeight * zoom;
+        // Центрируем и применяем смещение
+        const centerX = (frameWidth - imgWidth) / 2;
+        const centerY = (frameHeight - imgHeight) / 2;
+        const editorFrameWidth = photo.settings.editorFrameWidth || 400;
+        const scale = frameWidth / editorFrameWidth;
+        imgLeft = centerX + photo.settings.crop.x * scale;
+        imgTop = centerY + photo.settings.crop.y * scale;
     }
 
     const rotateStyle = photo.settings.rotation !== 0 ? `transform: rotate(${photo.settings.rotation}deg);` : '';
@@ -1186,6 +1199,12 @@ function closeEditor() {
         }
     }
 
+    // Удаляем фоновое изображение
+    const bgImg = document.getElementById('editor-image-bg');
+    if (bgImg) {
+        bgImg.remove();
+    }
+
     document.getElementById('editor-modal').classList.remove('active');
 }
 
@@ -1310,67 +1329,101 @@ function renderEditorCanvas() {
     // Устанавливаем размер рамки (фиксированная!)
     cropFrame.style.width = `${displayFrameWidth}px`;
     cropFrame.style.height = `${displayFrameHeight}px`;
+    cropFrame.style.overflow = 'hidden';
+    cropFrame.style.position = 'relative';
+    
+    // Создаём полупрозрачное фоновое изображение в canvas
+    let bgImg = document.getElementById('editor-image-bg');
+    if (!bgImg) {
+        bgImg = document.createElement('img');
+        bgImg.id = 'editor-image-bg';
+        bgImg.style.position = 'absolute';
+        bgImg.style.pointerEvents = 'none';
+        bgImg.style.opacity = '0.3';
+        bgImg.style.zIndex = '0';
+        canvas.style.position = 'relative';
+        canvas.style.overflow = 'hidden'; // Обрезаем по границе canvas
+        canvas.insertBefore(bgImg, canvas.firstChild);
+    }
 
     // Функция для применения стилей к изображению
     const applyImageStyles = () => {
         const imgNaturalRatio = photo.width / photo.height;
-        const zoom = photo.settings.crop.zoom / 100;
+        const isRotated90or270 = photo.settings.rotation === 90 || photo.settings.rotation === 270;
+        
+        // Визуальное соотношение сторон с учётом поворота
+        const visualRatio = isRotated90or270 ? (photo.height / photo.width) : imgNaturalRatio;
+        
+        // В режиме fullImage минимальный zoom = 100%, чтобы избежать паспарту
+        const zoom = photo.settings.fullImage 
+            ? Math.max(photo.settings.crop.zoom, 100) / 100
+            : photo.settings.crop.zoom / 100;
 
-        let imgWidth, imgHeight;
-
+        let baseWidth, baseHeight;
+        
+        // Рассчитываем ВИЗУАЛЬНЫЕ размеры (которые увидим после поворота)
         if (photo.settings.fullImage) {
-            // Вписываем целиком с полями
-            if (imgNaturalRatio > frameRatio) {
-                imgWidth = displayFrameWidth;
-                imgHeight = displayFrameWidth / imgNaturalRatio;
+            // Режим "с полями" - вписываем изображение (contain)
+            if (visualRatio > frameRatio) {
+                baseWidth = displayFrameWidth;
+                baseHeight = baseWidth / visualRatio;
             } else {
-                imgHeight = displayFrameHeight;
-                imgWidth = displayFrameHeight * imgNaturalRatio;
+                baseHeight = displayFrameHeight;
+                baseWidth = baseHeight * visualRatio;
             }
-            cropFrame.classList.add('with-padding');
             cropFrame.style.background = '#fff';
-
-            // Центрируем - поля равномерно с обеих сторон
-            const offsetX = (displayFrameWidth - imgWidth) / 2;
-            const offsetY = (displayFrameHeight - imgHeight) / 2;
-
-            img.style.width = `${imgWidth}px`;
-            img.style.height = `${imgHeight}px`;
-            img.style.left = `${offsetX}px`;
-            img.style.top = `${offsetY}px`;
-            img.style.transform = `rotate(${photo.settings.rotation}deg)`;
-
         } else {
-            // Заполняем рамку (с обрезкой)
-            if (imgNaturalRatio > frameRatio) {
-                imgHeight = displayFrameHeight * zoom;
-                imgWidth = imgHeight * imgNaturalRatio;
+            // Обычный режим - заполняем рамку (cover)
+            if (visualRatio > frameRatio) {
+                baseHeight = displayFrameHeight;
+                baseWidth = baseHeight * visualRatio;
             } else {
-                imgWidth = displayFrameWidth * zoom;
-                imgHeight = imgWidth / imgNaturalRatio;
+                baseWidth = displayFrameWidth;
+                baseHeight = baseWidth / visualRatio;
             }
-            cropFrame.classList.remove('with-padding');
             cropFrame.style.background = 'transparent';
-
-            // Центрируем изображение, затем применяем смещение пользователя
-            const centerOffsetX = (displayFrameWidth - imgWidth) / 2;
-            const centerOffsetY = (displayFrameHeight - imgHeight) / 2;
-
-            img.style.width = `${imgWidth}px`;
-            img.style.height = `${imgHeight}px`;
-            img.style.left = `${centerOffsetX + photo.settings.crop.x}px`;
-            img.style.top = `${centerOffsetY + photo.settings.crop.y}px`;
-            img.style.transform = `rotate(${photo.settings.rotation}deg)`;
         }
+
+        // Применяем зум к визуальным размерам
+        const visualWidth = baseWidth * zoom;
+        const visualHeight = baseHeight * zoom;
+
+        // Для CSS нужно задать размеры ДО поворота
+        // При rotate(90/270) браузер визуально поменяет W и H местами
+        const cssWidth = isRotated90or270 ? visualHeight : visualWidth;
+        const cssHeight = isRotated90or270 ? visualWidth : visualHeight;
+
+        // Центрируем по CSS размерам (rotate поворачивает вокруг центра, 
+        // поэтому центрирование по CSS автоматически даёт правильный визуальный центр)
+        const finalX = (displayFrameWidth - cssWidth) / 2 + photo.settings.crop.x;
+        const finalY = (displayFrameHeight - cssHeight) / 2 + photo.settings.crop.y;
+
+        // Основное изображение
+        img.style.width = `${cssWidth}px`;
+        img.style.height = `${cssHeight}px`;
+        img.style.left = `${finalX}px`;
+        img.style.top = `${finalY}px`;
+        img.style.transform = `rotate(${photo.settings.rotation}deg)`;
+
+        // Фоновое изображение (показывает часть за рамкой)
+        const cropFrameRect = cropFrame.getBoundingClientRect();
+        const canvasRect2 = canvas.getBoundingClientRect();
+        const offsetX = cropFrameRect.left - canvasRect2.left;
+        const offsetY = cropFrameRect.top - canvasRect2.top;
+        
+        bgImg.src = photo.url;
+        bgImg.style.width = `${cssWidth}px`;
+        bgImg.style.height = `${cssHeight}px`;
+        bgImg.style.left = `${offsetX + finalX}px`;
+        bgImg.style.top = `${offsetY + finalY}px`;
+        bgImg.style.transform = `rotate(${photo.settings.rotation}deg)`;
 
         // Фильтр
-        if (photo.settings.filter === 'grayscale') {
-            img.style.filter = 'grayscale(100%)';
-        } else if (photo.settings.filter === 'sepia') {
-            img.style.filter = 'sepia(100%)';
-        } else {
-            img.style.filter = 'none';
-        }
+        const filterValue = photo.settings.filter === 'grayscale' ? 'grayscale(100%)' 
+                          : photo.settings.filter === 'sepia' ? 'sepia(100%)' 
+                          : 'none';
+        img.style.filter = filterValue;
+        bgImg.style.filter = filterValue;
     };
 
     // Принудительно перезагружаем изображение
@@ -1395,11 +1448,12 @@ function renderEditorCanvas() {
     }
 }
 
-function updateEditorZoom(zoom) {
+function updateEditorZoom(newZoom) {
     const photo = AppState.photos[currentEditorPhotoIndex];
-    if (!photo || photo.settings.fullImage) return;
+    if (!photo) return;
 
-    photo.settings.crop.zoom = zoom;
+    // Просто обновляем зум, позиция сохраняется
+    photo.settings.crop.zoom = newZoom;
     renderEditorCanvas();
 }
 
@@ -1420,9 +1474,9 @@ function updateEditorFullImage(fullImage) {
     const photo = AppState.photos[currentEditorPhotoIndex];
     if (photo) {
         photo.settings.fullImage = fullImage;
-        // Сбрасываем crop при переключении
-        photo.settings.crop = { x: 0, y: 0, zoom: 100 };
-        document.getElementById('editor-zoom').value = 100;
+        // Сбрасываем позицию для корректного центрирования, но оставляем zoom
+        photo.settings.crop.x = 0;
+        photo.settings.crop.y = 0;
         renderEditorCanvas();
     }
 }
@@ -1475,7 +1529,7 @@ function rotatePhoto() {
 // Drag для перемещения фото внутри рамки
 function startDrag(e) {
     const photo = AppState.photos[currentEditorPhotoIndex];
-    if (!photo || photo.settings.fullImage) return;
+    if (!photo) return;
 
     e.preventDefault();
     editorDragState.isDragging = true;
@@ -1506,9 +1560,8 @@ function onDrag(e) {
     photo.settings.crop.x = editorDragState.offsetX + deltaX;
     photo.settings.crop.y = editorDragState.offsetY + deltaY;
 
-    const img = document.getElementById('editor-image');
-    img.style.left = `${photo.settings.crop.x}px`;
-    img.style.top = `${photo.settings.crop.y}px`;
+    // Перерисовываем для корректного обновления позиций
+    renderEditorCanvas();
 }
 
 function endDrag() {
@@ -1662,13 +1715,13 @@ function showOrderModal() {
 
     // Формируем строку с размерами
     const sizesInfo = Object.entries(sizeGroups)
-        .map(([size, count]) => `${count} \u00d7 ${size}`)
+        .map(([size, count]) => `${count} × ${size}`)
         .join(', ');
 
     // Общее количество фото
     const totalPhotos = AppState.photos.reduce((sum, p) => sum + p.settings.quantity, 0);
 
-    document.getElementById('order-photos-count').textContent = `${totalPhotos} \u0444\u043e\u0442\u043e`;
+    document.getElementById('order-photos-count').textContent = `${totalPhotos} фото`;
     document.getElementById('order-size').textContent = sizesInfo;
 
     document.getElementById('order-cost').textContent = AppState.totalPrice;
@@ -1678,15 +1731,66 @@ function showOrderModal() {
         document.getElementById('order-preview-thumb').style.backgroundSize = 'cover';
     }
 
+    // Проверяем авторизацию и показываем/скрываем блок для гостей
+    updateOrderModalAuthState();
+
     modal.classList.add('active');
+}
+
+// Обновить состояние авторизации в модалке заказа
+function updateOrderModalAuthState() {
+    const token = localStorage.getItem('access');
+    const modal = document.getElementById('order-modal');
+    const btnOrder = document.getElementById('btn-order');
+    
+    // Находим или создаём блок для гостей
+    let guestBlock = document.getElementById('order-guest-block');
+    
+    if (!token) {
+        // Гость - показываем предупреждение
+        if (!guestBlock) {
+            guestBlock = document.createElement('div');
+            guestBlock.id = 'order-guest-block';
+            guestBlock.className = 'order-guest-block';
+            guestBlock.innerHTML = `
+                <div class="order-guest-message">
+                    <p>Для оформления заказа необходимо войти в аккаунт или зарегистрироваться</p>
+                </div>
+                <button class="btn-login" id="btn-order-login">Войти / Зарегистрироваться</button>
+            `;
+            
+            // Вставляем перед кнопкой заказа
+            btnOrder?.parentNode?.insertBefore(guestBlock, btnOrder);
+            
+            // Добавляем обработчик
+            document.getElementById('btn-order-login')?.addEventListener('click', () => {
+                if (window.AppHeader) {
+                    AppHeader.showAuthModal();
+                }
+            });
+        }
+        
+        guestBlock.style.display = 'block';
+        if (btnOrder) {
+            btnOrder.style.display = 'none';
+        }
+    } else {
+        // Авторизован - скрываем блок гостя
+        if (guestBlock) {
+            guestBlock.style.display = 'none';
+        }
+        if (btnOrder) {
+            btnOrder.style.display = 'block';
+        }
+    }
 }
 
 async function submitOrder() {
     const token = localStorage.getItem('access');
 
+    // Если гость - обновляем состояние модалки
     if (!token) {
-        alert('Для оформления заказа необходимо войти в аккаунт');
-        window.location.href = '/frontend/index.html';
+        updateOrderModalAuthState();
         return;
     }
 
