@@ -256,31 +256,18 @@ const AppHeader = {
         });
     },
     
-    // Проверка авторизации
-    async checkAuth() {
+    // Проверка авторизации - просто читаем из localStorage
+    checkAuth() {
         const token = localStorage.getItem('access');
-        if (!token) {
-            this.updateUI(null);
-            return;
-        }
+        const username = localStorage.getItem('username');
         
-        try {
-            const res = await fetch(`${this.API_BASE}/auth/me/`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            
-            if (res.ok) {
-                const user = await res.json();
-                this.currentUser = user;
-                this.isAuthenticated = true;
-                this.updateUI(user);
-            } else {
-                localStorage.removeItem('access');
-                localStorage.removeItem('refresh_token');
-                this.updateUI(null);
-            }
-        } catch (error) {
-            console.error('Auth check failed:', error);
+        if (token && username) {
+            this.currentUser = { username };
+            this.isAuthenticated = true;
+            this.updateUI({ username });
+        } else {
+            this.currentUser = null;
+            this.isAuthenticated = false;
             this.updateUI(null);
         }
     },
@@ -400,8 +387,9 @@ const AppHeader = {
             
             if (res.ok) {
                 localStorage.setItem('access', data.access);
-                localStorage.setItem('refresh_token', data.refresh);
-                await this.checkAuth();
+                localStorage.setItem('refresh', data.refresh);
+                localStorage.setItem('username', username);
+                this.checkAuth();
                 
                 if (isModal) {
                     this.hideAuthModal();
@@ -413,6 +401,11 @@ const AppHeader = {
                     this.hideAuthDropdown();
                 }
                 form.reset();
+                
+                // Переносим проект из localStorage в БД
+                if (typeof window.onUserLogin === 'function') {
+                    window.onUserLogin();
+                }
             } else {
                 alert(data.detail || 'Ошибка входа');
             }
@@ -450,8 +443,9 @@ const AppHeader = {
                 
                 if (loginRes.ok) {
                     localStorage.setItem('access', loginData.access);
-                    localStorage.setItem('refresh_token', loginData.refresh);
-                    await this.checkAuth();
+                    localStorage.setItem('refresh', loginData.refresh);
+                    localStorage.setItem('username', username);
+                    this.checkAuth();
                     
                     if (isModal) {
                         this.hideAuthModal();
@@ -463,6 +457,11 @@ const AppHeader = {
                         this.hideAuthDropdown();
                     }
                     form.reset();
+                    
+                    // Переносим проект из localStorage в БД
+                    if (typeof window.onUserLogin === 'function') {
+                        window.onUserLogin();
+                    }
                 }
             } else {
                 alert(data.detail || data.username?.[0] || data.email?.[0] || 'Ошибка регистрации');
@@ -476,7 +475,8 @@ const AppHeader = {
     // Выход
     logout() {
         localStorage.removeItem('access');
-        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('refresh');
+        localStorage.removeItem('username');
         this.currentUser = null;
         this.isAuthenticated = false;
         this.updateUI(null);

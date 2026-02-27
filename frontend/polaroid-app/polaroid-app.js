@@ -29,7 +29,6 @@ const AppState = {
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
     loadPrintOptions();
     initStepNavigation();
     initUploadSources();
@@ -42,28 +41,6 @@ document.addEventListener('DOMContentLoaded', () => {
     initFooterButtons();
     initFullImageWarningModal();
 });
-
-// ==================== AUTH ====================
-async function checkAuth() {
-    // Авторизация теперь обрабатывается через AppHeader
-    // Эта функция оставлена для совместимости
-    const token = localStorage.getItem('access');
-    if (!token) {
-        return null;
-    }
-
-    try {
-        const res = await fetch('http://127.0.0.1:8000/api/auth/me/', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (res.ok) {
-            return await res.json();
-        }
-    } catch (e) {
-        console.error('Auth check failed:', e);
-    }
-    return null;
-}
 
 // ==================== POLAROID SPEC HELPERS ====================
 

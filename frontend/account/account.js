@@ -34,6 +34,7 @@ async function checkAccountAuth() {
     }
     
     try {
+        // Проверяем токен на сервере (только для защищённых страниц)
         const res = await fetch('http://127.0.0.1:8000/api/auth/me/', {
             headers: {
                 'Authorization': 'Bearer ' + token
@@ -43,11 +44,17 @@ async function checkAccountAuth() {
         if (!res.ok) throw new Error('Unauthorized');
         
         const user = await res.json();
+        
+        // Обновляем username в localStorage на случай если изменился
+        localStorage.setItem('username', user.username);
+        
         updateAccountUI(user);
         
     } catch (error) {
         console.error('Auth check failed:', error);
-        localStorage.clear();
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        localStorage.removeItem('username');
         window.location.href = '/frontend/index.html';
     }
 }

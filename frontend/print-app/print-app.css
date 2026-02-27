@@ -120,6 +120,54 @@ body {
     color: var(--bg-white);
 }
 
+/* Project name input in nav */
+.project-name-input {
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    font-size: 14px;
+    width: 200px;
+    background: var(--bg-white);
+}
+
+.project-name-input:focus {
+    outline: none;
+    border-color: var(--primary);
+}
+
+/* Save status */
+.save-status {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    font-size: 13px;
+    color: var(--text-muted);
+}
+
+.save-status.saved {
+    color: #27ae60;
+}
+
+.save-status.saved .save-status-icon {
+    color: #27ae60;
+}
+
+.save-status.not-saved {
+    color: var(--danger);
+}
+
+.save-status.not-saved .save-status-icon {
+    color: var(--danger);
+}
+
+.save-status.saving {
+    color: var(--text-muted);
+}
+
+.save-status-icon {
+    font-size: 14px;
+}
+
 /* ==================== MAIN CONTENT ==================== */
 .app-content {
     flex: 1;
@@ -199,6 +247,14 @@ body {
 .source-name {
     font-size: 14px;
     color: var(--text);
+}
+
+/* Upload formats info */
+.upload-formats-info {
+    margin-top: 20px;
+    text-align: center;
+    font-size: 13px;
+    color: var(--text-muted);
 }
 
 /* Gallery Picker */

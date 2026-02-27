@@ -3,6 +3,17 @@
 // API URL
 const API_URL = 'http://127.0.0.1:8000/api';
 
+// Конфигурация приложения
+const APP_CONFIG = {
+    prefix: 'print_',           // Префикс для ID проекта
+    productType: 'prints',      // Тип продукта для API
+    defaultProjectName: 'Проект печати',
+    localStorageKey: 'print_app_draft',
+    autoSaveInterval: 60000,    // 60 секунд
+    maxFileSize: 200 * 1024 * 1024, // 200 МБ
+    allowedFormats: ['jpg', 'jpeg', 'png', 'bmp', 'heic', 'webp', 'tiff', 'tif']
+};
+
 // Состояние приложения
 const AppState = {
     currentStep: 1,
@@ -10,12 +21,19 @@ const AppState = {
     sizes: [], // { value, label, price, ratio } - загружаются с API
     papers: [], // { value, label, coefficient } - загружаются с API
     projectId: null, // UUID проекта в БД
-    projectName: 'Проект печати',
+    projectName: APP_CONFIG.defaultProjectName,
     totalPrice: 0,
     fullImageWarningShown: false, // показано ли предупреждение о полях
     sortOrder: 'asc', // 'asc' или 'desc'
     defaultSize: null, // размер из URL-параметров (со standard-photos.html)
-    defaultPaper: null
+    defaultPaper: null,
+    
+    // Автосохранение
+    hasUnsavedChanges: false,
+    lastSavedData: null,
+    saveStatus: 'none', // 'none', 'saving', 'saved', 'not-saved'
+    autoSaveTimer: null,
+    projectStartTime: null
 };
 
 // Стандартные соотношения сторон для печати
@@ -30,9 +48,407 @@ const PRINT_RATIOS = {
     '30x30': 1
 };
 
+// ==================== AUTO SAVE ====================
+
+function initAutoSave() {
+    // Предупреждение при закрытии страницы с несохранёнными изменениями
+    window.addEventListener('beforeunload', (e) => {
+        if (AppState.hasUnsavedChanges && AppState.photos.length > 0) {
+            e.preventDefault();
+            e.returnValue = 'У вас есть несохранённые изменения. Вы уверены, что хотите покинуть страницу?';
+            return e.returnValue;
+        }
+    });
+    
+    // Запускаем автосохранение
+    startAutoSaveTimer();
+}
+
+function initProjectNameInput() {
+    const input = document.getElementById('project-name');
+    if (input) {
+        input.value = AppState.projectName;
+        input.addEventListener('input', (e) => {
+            AppState.projectName = e.target.value || APP_CONFIG.defaultProjectName;
+            markAsChanged();
+        });
+    }
+}
+
+function startAutoSaveTimer() {
+    // Очищаем предыдущий таймер
+    if (AppState.autoSaveTimer) {
+        clearInterval(AppState.autoSaveTimer);
+    }
+    
+    // Запускаем новый таймер
+    AppState.autoSaveTimer = setInterval(() => {
+        autoSave();
+    }, APP_CONFIG.autoSaveInterval);
+}
+
+async function autoSave() {
+    // Не сохраняем если нет фото
+    if (AppState.photos.length === 0) {
+        return;
+    }
+    
+    // Не сохраняем если нет изменений
+    if (!AppState.hasUnsavedChanges) {
+        return;
+    }
+    
+    // Первое автосохранение только через минуту после начала работы
+    if (!AppState.projectStartTime) {
+        return;
+    }
+    
+    const timeSinceStart = Date.now() - AppState.projectStartTime;
+    if (timeSinceStart < APP_CONFIG.autoSaveInterval) {
+        return;
+    }
+    
+    await saveProject(true); // true = автосохранение (тихое)
+}
+
+// Пометить что есть несохранённые изменения
+function markAsChanged() {
+    AppState.hasUnsavedChanges = true;
+    updateSaveStatus('not-saved');
+    
+    // Запоминаем время начала работы
+    if (!AppState.projectStartTime && AppState.photos.length > 0) {
+        AppState.projectStartTime = Date.now();
+    }
+}
+
+// Обновить статус сохранения в UI
+function updateSaveStatus(status) {
+    AppState.saveStatus = status;
+    const statusEl = document.getElementById('save-status');
+    if (!statusEl) return;
+    
+    statusEl.className = 'save-status ' + status;
+    
+    const iconEl = statusEl.querySelector('.save-status-icon');
+    const textEl = statusEl.querySelector('.save-status-text');
+    
+    switch (status) {
+        case 'saved':
+            if (iconEl) iconEl.textContent = '✓';
+            if (textEl) textEl.textContent = 'Сохранено';
+            break;
+        case 'not-saved':
+            if (iconEl) iconEl.textContent = '○';
+            if (textEl) textEl.textContent = 'Не сохранено';
+            break;
+        case 'saving':
+            if (iconEl) iconEl.textContent = '↻';
+            if (textEl) textEl.textContent = 'Сохранение...';
+            break;
+        default:
+            if (iconEl) iconEl.textContent = '○';
+            if (textEl) textEl.textContent = 'Не сохранено';
+    }
+}
+
+// Сохранить проект
+async function saveProject(isAutoSave = false) {
+    const token = localStorage.getItem('access');
+    
+    // Для гостей - сохраняем в localStorage
+    if (!token) {
+        if (isAutoSave) {
+            saveToLocalStorage();
+            return;
+        }
+        // При ручном сохранении - показываем модалку авторизации
+        if (window.AppHeader) {
+            AppHeader.showAuthModal();
+        }
+        return;
+    }
+    
+    // Для авторизованных - сохраняем в БД
+    updateSaveStatus('saving');
+    
+    try {
+        // Обновляем общую стоимость перед сохранением
+        updateTotalPrice();
+        
+        const projectData = {
+            name: AppState.projectName,
+            product_type: APP_CONFIG.productType,
+            data: {
+                photos: AppState.photos.map(p => ({
+                    id: p.id,
+                    name: p.name,
+                    width: p.width,
+                    height: p.height,
+                    url: p.url,
+                    settings: p.settings
+                }))
+            },
+            total_price: AppState.totalPrice,
+            preview_url: AppState.photos[0]?.url || null
+        };
+        
+        let response;
+        
+        if (AppState.projectId) {
+            // Обновляем существующий проект
+            response = await fetch(`${API_URL}/projects/${AppState.projectId}/`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(projectData)
+            });
+        } else {
+            // Создаём новый проект
+            response = await fetch(`${API_URL}/projects/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(projectData)
+            });
+        }
+        
+        if (!response.ok) {
+            throw new Error('Failed to save project');
+        }
+        
+        const savedProject = await response.json();
+        AppState.projectId = savedProject.id;
+        AppState.hasUnsavedChanges = false;
+        AppState.lastSavedData = JSON.stringify(projectData);
+        
+        updateSaveStatus('saved');
+        
+        // Очищаем localStorage после успешного сохранения в БД
+        clearLocalStorage();
+        
+        if (!isAutoSave) {
+            console.log('Проект сохранён:', savedProject.id);
+        }
+        
+    } catch (error) {
+        console.error('Save error:', error);
+        updateSaveStatus('not-saved');
+        
+        // При ошибке сохраняем в localStorage как backup
+        saveToLocalStorage();
+        
+        if (!isAutoSave) {
+            alert('Не удалось сохранить проект. Изменения сохранены локально.');
+        }
+    }
+}
+
+// Сохранить в localStorage (для гостей или как backup)
+function saveToLocalStorage() {
+    try {
+        const data = {
+            projectId: AppState.projectId,
+            projectName: AppState.projectName,
+            photos: AppState.photos.map(p => ({
+                id: p.id,
+                name: p.name,
+                width: p.width,
+                height: p.height,
+                url: p.url, // Может быть blob URL - не сохранится между сессиями
+                settings: p.settings
+            })),
+            totalPrice: AppState.totalPrice,
+            savedAt: Date.now()
+        };
+        
+        localStorage.setItem(APP_CONFIG.localStorageKey, JSON.stringify(data));
+        AppState.hasUnsavedChanges = false;
+        updateSaveStatus('saved');
+        
+    } catch (error) {
+        console.error('localStorage save error:', error);
+    }
+}
+
+// Загрузить черновик
+function loadDraft() {
+    // Проверяем URL на наличие project_id для загрузки из БД
+    const urlParams = new URLSearchParams(window.location.search);
+    const projectIdFromUrl = urlParams.get('project_id');
+    
+    if (projectIdFromUrl) {
+        loadProjectFromDB(projectIdFromUrl);
+        return;
+    }
+    
+    // Пробуем загрузить из localStorage
+    loadFromLocalStorage();
+}
+
+// Загрузить проект из БД
+async function loadProjectFromDB(projectId) {
+    const token = localStorage.getItem('access');
+    if (!token) {
+        console.log('Not authenticated, cannot load project from DB');
+        return;
+    }
+    
+    try {
+        const response = await fetch(`${API_URL}/projects/${projectId}/`, {
+            headers: {
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error('Failed to load project');
+        }
+        
+        const project = await response.json();
+        
+        // Восстанавливаем состояние
+        AppState.projectId = project.id;
+        AppState.projectName = project.name;
+        AppState.totalPrice = parseFloat(project.total_price) || 0;
+        
+        // Обновляем поле названия
+        const nameInput = document.getElementById('project-name');
+        if (nameInput) nameInput.value = AppState.projectName;
+        
+        // Восстанавливаем фото из данных проекта
+        if (project.data && project.data.photos) {
+            AppState.photos = project.data.photos.map(p => ({
+                ...p,
+                url: p.url // URL с сервера
+            }));
+            
+            updatePhotosCount();
+            renderUploadedPhotos();
+            
+            if (AppState.photos.length > 0) {
+                document.getElementById('upload-sources').style.display = 'none';
+                document.getElementById('uploaded-photos').style.display = 'block';
+            }
+        }
+        
+        updateSaveStatus('saved');
+        console.log('Project loaded from DB:', projectId);
+        
+    } catch (error) {
+        console.error('Load project error:', error);
+        alert('Не удалось загрузить проект');
+    }
+}
+
+// Загрузить из localStorage
+function loadFromLocalStorage() {
+    try {
+        const saved = localStorage.getItem(APP_CONFIG.localStorageKey);
+        if (!saved) return;
+        
+        const data = JSON.parse(saved);
+        
+        // Проверяем не слишком ли старые данные (больше 7 дней)
+        if (data.savedAt && Date.now() - data.savedAt > 7 * 24 * 60 * 60 * 1000) {
+            clearLocalStorage();
+            return;
+        }
+        
+        // Спрашиваем пользователя
+        if (data.photos && data.photos.length > 0) {
+            const restore = confirm(`Найден несохранённый проект "${data.projectName}" (${data.photos.length} фото). Восстановить?`);
+            
+            if (restore) {
+                AppState.projectId = data.projectId;
+                AppState.projectName = data.projectName;
+                AppState.totalPrice = data.totalPrice || 0;
+                
+                const nameInput = document.getElementById('project-name');
+                if (nameInput) nameInput.value = AppState.projectName;
+                
+                // Примечание: blob URL не сохраняются между сессиями
+                // Пользователю придётся перезагрузить фото
+                AppState.photos = data.photos.filter(p => p.url && !p.url.startsWith('blob:'));
+                
+                if (AppState.photos.length < data.photos.length) {
+                    alert('Некоторые фотографии не удалось восстановить. Пожалуйста, загрузите их снова.');
+                }
+                
+                if (AppState.photos.length > 0) {
+                    updatePhotosCount();
+                    renderUploadedPhotos();
+                    document.getElementById('upload-sources').style.display = 'none';
+                    document.getElementById('uploaded-photos').style.display = 'block';
+                }
+                
+                updateSaveStatus('saved');
+            } else {
+                clearLocalStorage();
+            }
+        }
+        
+    } catch (error) {
+        console.error('localStorage load error:', error);
+        clearLocalStorage();
+    }
+}
+
+function clearLocalStorage() {
+    try {
+        localStorage.removeItem(APP_CONFIG.localStorageKey);
+    } catch (error) {
+        console.error('localStorage clear error:', error);
+    }
+}
+
+// Перенос проекта из localStorage в БД после авторизации
+// Вызывается из app-header.js после успешного логина
+window.onUserLogin = async function() {
+    const token = localStorage.getItem('access');
+    if (!token) return;
+    
+    // Проверяем есть ли несохранённый проект в localStorage
+    const saved = localStorage.getItem(APP_CONFIG.localStorageKey);
+    if (!saved) return;
+    
+    try {
+        const data = JSON.parse(saved);
+        if (!data.photos || data.photos.length === 0) return;
+        
+        // Если текущий проект пустой - восстанавливаем из localStorage
+        if (AppState.photos.length === 0) {
+            AppState.projectName = data.projectName;
+            AppState.photos = data.photos.filter(p => p.url && !p.url.startsWith('blob:'));
+            
+            const nameInput = document.getElementById('project-name');
+            if (nameInput) nameInput.value = AppState.projectName;
+            
+            if (AppState.photos.length > 0) {
+                updatePhotosCount();
+                renderUploadedPhotos();
+                document.getElementById('upload-sources').style.display = 'none';
+                document.getElementById('uploaded-photos').style.display = 'block';
+            }
+        }
+        
+        // Сохраняем в БД
+        if (AppState.photos.length > 0) {
+            await saveProject(true);
+            console.log('Project transferred from localStorage to DB');
+        }
+        
+    } catch (error) {
+        console.error('Failed to transfer project to DB:', error);
+    }
+};
+
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
-    checkAuth();
     loadPrintOptions();
     initStepNavigation();
     initUploadSources();
@@ -44,29 +460,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initOrderModal();
     initFooterButtons();
     initFullImageWarningModal();
+    initAutoSave();
+    initProjectNameInput();
+    loadDraft(); // Загружаем черновик если есть
 });
-
-// ==================== AUTH ====================
-async function checkAuth() {
-    // Авторизация теперь обрабатывается через AppHeader
-    // Эта функция оставлена для совместимости
-    const token = localStorage.getItem('access');
-    if (!token) {
-        return null;
-    }
-    
-    try {
-        const res = await fetch('http://127.0.0.1:8000/api/auth/me/', {
-            headers: { 'Authorization': 'Bearer ' + token }
-        });
-        if (res.ok) {
-            return await res.json();
-        }
-    } catch (e) {
-        console.error('Auth check failed:', e);
-    }
-    return null;
-}
 
 // ==================== LOAD PRINT OPTIONS ====================
 async function loadPrintOptions() {
@@ -465,9 +862,33 @@ function initUploadSources() {
 }
 
 async function handleFileUpload(files) {
+    const validFiles = [];
+    const errors = [];
+    
     for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) continue;
+        // Проверяем формат
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (!APP_CONFIG.allowedFormats.includes(ext) && !file.type.startsWith('image/')) {
+            errors.push(`${file.name}: неподдерживаемый формат`);
+            continue;
+        }
         
+        // Проверяем размер
+        if (file.size > APP_CONFIG.maxFileSize) {
+            errors.push(`${file.name}: файл больше 200 МБ`);
+            continue;
+        }
+        
+        validFiles.push(file);
+    }
+    
+    // Показываем ошибки если есть
+    if (errors.length > 0) {
+        alert('Некоторые файлы не были загружены:\n' + errors.join('\n'));
+    }
+    
+    // Загружаем валидные файлы
+    for (const file of validFiles) {
         const id = Date.now() + Math.random().toString(36).substr(2, 9);
         const url = URL.createObjectURL(file);
         
@@ -489,9 +910,12 @@ async function handleFileUpload(files) {
         });
     }
     
-    updatePhotosCount();
-    renderUploadedPhotos();
-    showUploadedPhotos();
+    if (validFiles.length > 0) {
+        updatePhotosCount();
+        renderUploadedPhotos();
+        showUploadedPhotos();
+        markAsChanged();
+    }
 }
 
 function getDefaultSettings(orientation) {
@@ -593,6 +1017,7 @@ function removePhoto(id) {
         AppState.photos.splice(index, 1);
         updatePhotosCount();
         renderUploadedPhotos();
+        markAsChanged();
         
         if (AppState.photos.length === 0) {
             document.getElementById('upload-sources').style.display = 'flex';
@@ -820,6 +1245,7 @@ function updatePhotoSetting(id, key, value) {
     if (photo) {
         photo.settings[key] = value;
         updateTotalPrice();
+        markAsChanged();
     }
 }
 
@@ -858,6 +1284,7 @@ function applySettingsFromPhoto(photoId) {
     
     renderSettingsPage();
     updateTotalPrice();
+    markAsChanged();
     alert('Настройки применены ко всем фото');
 }
 
@@ -1585,6 +2012,7 @@ function applyEditorChanges() {
     closeEditor();
     renderPreviewPage();
     updateTotalPrice();
+    markAsChanged();
 }
 
 function applyCropToAll() {
@@ -1614,6 +2042,7 @@ function applyCropToAll() {
         }
     });
     
+    markAsChanged();
     alert('Настройки применены ко всем фото');
 }
 
@@ -1808,8 +2237,7 @@ async function submitOrder() {
         }
         
         // Сохраняем имя проекта
-        const projectName = document.getElementById('project-name')?.value || 'Проект печати';
-        AppState.projectName = projectName;
+        AppState.projectName = document.getElementById('project-name')?.value || APP_CONFIG.defaultProjectName;
         
         // Создаём заказ через API
         const order = await createOrderFromProject();
@@ -1818,11 +2246,21 @@ async function submitOrder() {
         
         document.getElementById('order-modal').classList.remove('active');
         
-        // Очистка
+        // Очистка состояния
         AppState.photos = [];
         AppState.projectId = null;
+        AppState.projectName = APP_CONFIG.defaultProjectName;
         AppState.fullImageWarningShown = false;
+        AppState.hasUnsavedChanges = false;
+        AppState.projectStartTime = null;
+        
+        // Очищаем localStorage
+        clearLocalStorage();
+        
+        // Обновляем UI
         updatePhotosCount();
+        updateSaveStatus('none');
+        document.getElementById('project-name').value = APP_CONFIG.defaultProjectName;
         goToStep(1);
         document.getElementById('upload-sources').style.display = 'flex';
         document.getElementById('uploaded-photos').style.display = 'none';
@@ -1864,8 +2302,7 @@ function initFooterButtons() {
 }
 
 async function handleSaveProject() {
-    const projectName = document.getElementById('project-name')?.value || 'Проект печати';
-    AppState.projectName = projectName;
+    AppState.projectName = document.getElementById('project-name')?.value || APP_CONFIG.defaultProjectName;
     
     const btnSave = document.getElementById('btn-save');
     const originalText = btnSave?.textContent;
@@ -1876,12 +2313,8 @@ async function handleSaveProject() {
             btnSave.disabled = true;
         }
         
-        await saveProject();
-        alert('Проект сохранён!');
+        await saveProject(false); // false = ручное сохранение
         
-    } catch (e) {
-        console.error('Save failed:', e);
-        alert('Ошибка сохранения. Попробуйте позже.');
     } finally {
         if (btnSave) {
             btnSave.textContent = originalText;

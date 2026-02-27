@@ -1,4 +1,5 @@
 // scripts.js
+
 let submenuData = {};
 
 // Определяем базовый путь к frontend в зависимости от текущей страницы
@@ -290,23 +291,15 @@ function initAuth() {
     }
 
     // ---------- CHECK AUTH ----------
-    async function checkAuth() {
+    // Просто читаем из localStorage, без запросов к серверу
+    function checkAuth() {
         const token = localStorage.getItem('access');
-        if (!token) return;
-
-        try {
-            const res = await fetch('http://127.0.0.1:8000/api/auth/me/', {
-                headers: {
-                    'Authorization': 'Bearer ' + token
-                }
-            });
-
-            if (!res.ok) throw new Error();
-
-            const user = await res.json();
-            updateAuthUI(user.username);
-        } catch {
-            localStorage.clear();
+        const username = localStorage.getItem('username');
+        
+        if (token && username) {
+            updateAuthUI(username);
+        } else {
+            updateAuthUI(null);
         }
     }
 
@@ -336,7 +329,9 @@ function initAuth() {
 
     // ---------- LOGOUT ----------
     headerLogoutBtn?.addEventListener('click', () => {
-        localStorage.clear();
+        localStorage.removeItem('access');
+        localStorage.removeItem('refresh');
+        localStorage.removeItem('username');
         updateAuthUI();
         userMenuDropdown?.classList.remove('active');
         window.location.reload();
@@ -375,8 +370,10 @@ function initAuth() {
 
         localStorage.setItem('access', data.access);
         localStorage.setItem('refresh', data.refresh);
+        localStorage.setItem('username', username);
 
-        await checkAuth();
+        checkAuth();
+        authDropdown?.classList.remove('active');
     });
 
     // ---------- REGISTER ----------
@@ -402,8 +399,10 @@ function initAuth() {
 
         localStorage.setItem('access', data.access);
         localStorage.setItem('refresh', data.refresh);
+        localStorage.setItem('username', username);
 
-        await checkAuth();
+        checkAuth();
+        authDropdown?.classList.remove('active');
     });
 
     // Проверяем авторизацию при загрузке
