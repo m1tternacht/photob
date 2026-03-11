@@ -499,8 +499,20 @@ function updateProjectCounts(projects) {
 }
 
 function renderProjectItem(project) {
-    const date = new Date(project.updated_at).toLocaleDateString('ru-RU');
-    const createdDate = new Date(project.created_at).toLocaleDateString('ru-RU');
+    const updatedDate = new Date(project.updated_at).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
+    const createdDate = new Date(project.created_at).toLocaleString('ru-RU', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
     
     const statusText = project.status === 'draft' ? 'Черновик' : 
                        project.status === 'ready' ? 'Готов' : 
@@ -526,7 +538,7 @@ function renderProjectItem(project) {
                     <dt>Создан</dt>
                     <dd>${createdDate}</dd>
                     <dt>Изменён</dt>
-                    <dd>${date}</dd>
+                    <dd>${updatedDate}</dd>
                 </dl>
             </div>
             <div class="project-list-actions">
@@ -537,7 +549,7 @@ function renderProjectItem(project) {
                 <div class="project-action-btns">
                     <button class="project-icon-btn btn-delete-project" data-id="${project.id}" title="Удалить">🗑️</button>
                 </div>
-                <button class="btn-outline btn-edit-project" data-id="${project.id}">Редактировать</button>
+                <button class="btn-outline btn-edit-project" data-id="${project.id}" data-type="${project.product_type_code}">Редактировать</button>
             </div>
         </div>
     `;
@@ -571,8 +583,19 @@ function initProjectActions() {
     document.querySelectorAll('.btn-edit-project').forEach(btn => {
         btn.addEventListener('click', () => {
             const id = btn.dataset.id;
-            // Переходим в приложение печати с ID проекта
-            window.location.href = `/frontend/print-app/?project=${id}`;
+            const type = btn.dataset.type || 'prints';
+            
+            // Определяем приложение по типу продукта
+            const appUrls = {
+                'prints': '/frontend/print-app/',
+                'polaroid': '/frontend/polaroid-app/',
+                'canvas': '/frontend/canvas-app/',
+                'calendar': '/frontend/calendar-app/',
+                'photobook': '/frontend/photobook-app/'
+            };
+            
+            const appUrl = appUrls[type] || '/frontend/print-app/';
+            window.location.href = `${appUrl}?project_id=${id}`;
         });
     });
 }
@@ -614,10 +637,12 @@ async function loadOrders() {
 }
 
 function renderOrderCard(order) {
-    const date = new Date(order.created_at).toLocaleDateString('ru-RU', {
+    const date = new Date(order.created_at).toLocaleString('ru-RU', {
         day: 'numeric',
         month: 'long',
-        year: 'numeric'
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
     });
     
     const statusMap = {

@@ -98,7 +98,15 @@ body {
 .steps-info {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 15px;
+    flex: 1;
+}
+
+.project-name-label {
+    font-size: 14px;
+    color: var(--text);
+    white-space: nowrap;
 }
 
 .photos-count {

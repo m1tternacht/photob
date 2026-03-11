@@ -20,6 +20,7 @@ const AppState = {
     photos: [], // { id, file, url, name, width, height, aspectRatio, orientation, settings: {...} }
     sizes: [], // { value, label, price, ratio } - загружаются с API
     papers: [], // { value, label, coefficient } - загружаются с API
+    productTypeId: null, // ID типа продукта из API
     projectId: null, // UUID проекта в БД
     projectName: APP_CONFIG.defaultProjectName,
     totalPrice: 0,
@@ -52,13 +53,14 @@ const PRINT_RATIOS = {
 
 function initAutoSave() {
     // Предупреждение при закрытии страницы с несохранёнными изменениями
-    window.addEventListener('beforeunload', (e) => {
-        if (AppState.hasUnsavedChanges && AppState.photos.length > 0) {
-            e.preventDefault();
-            e.returnValue = 'У вас есть несохранённые изменения. Вы уверены, что хотите покинуть страницу?';
-            return e.returnValue;
-        }
-    });
+    // Временно отключено для диагностики
+    // window.addEventListener('beforeunload', (e) => {
+    //     if (AppState.hasUnsavedChanges && AppState.photos.length > 0) {
+    //         e.preventDefault();
+    //         e.returnValue = 'У вас есть несохранённые изменения. Вы уверены, что хотите покинуть страницу?';
+    //         return e.returnValue;
+    //     }
+    // });
     
     // Запускаем автосохранение
     startAutoSaveTimer();
@@ -124,9 +126,13 @@ function markAsChanged() {
 
 // Обновить статус сохранения в UI
 function updateSaveStatus(status) {
+    console.log('updateSaveStatus:', status);
     AppState.saveStatus = status;
     const statusEl = document.getElementById('save-status');
-    if (!statusEl) return;
+    if (!statusEl) {
+        console.warn('save-status element not found!');
+        return;
+    }
     
     statusEl.className = 'save-status ' + status;
     
@@ -150,14 +156,18 @@ function updateSaveStatus(status) {
             if (iconEl) iconEl.textContent = '○';
             if (textEl) textEl.textContent = 'Не сохранено';
     }
+    console.log('Status updated, element class:', statusEl.className);
 }
 
 // Сохранить проект
 async function saveProject(isAutoSave = false) {
+    console.log('saveProject called, isAutoSave:', isAutoSave);
+    
     const token = localStorage.getItem('access');
     
     // Для гостей - сохраняем в localStorage
     if (!token) {
+        console.log('No token, saving to localStorage');
         if (isAutoSave) {
             saveToLocalStorage();
             return;
@@ -170,28 +180,34 @@ async function saveProject(isAutoSave = false) {
     }
     
     // Для авторизованных - сохраняем в БД
+    console.log('Saving to DB...');
     updateSaveStatus('saving');
     
     try {
+        // Сначала загружаем фото на сервер (если есть blob URL)
+        await uploadPhotosToServer(token);
+        
         // Обновляем общую стоимость перед сохранением
         updateTotalPrice();
         
         const projectData = {
             name: AppState.projectName,
-            product_type: APP_CONFIG.productType,
+            product_type: AppState.productTypeId || 1, // ID типа продукта
             data: {
                 photos: AppState.photos.map(p => ({
                     id: p.id,
                     name: p.name,
                     width: p.width,
                     height: p.height,
-                    url: p.url,
+                    url: p.serverUrl || p.url, // Используем серверный URL если есть
                     settings: p.settings
                 }))
             },
             total_price: AppState.totalPrice,
-            preview_url: AppState.photos[0]?.url || null
+            preview_url: AppState.photos[0]?.serverUrl || AppState.photos[0]?.url || null
         };
+        
+        console.log('Saving project data:', projectData);
         
         let response;
         
@@ -218,7 +234,9 @@ async function saveProject(isAutoSave = false) {
         }
         
         if (!response.ok) {
-            throw new Error('Failed to save project');
+            const errorText = await response.text();
+            console.error('Server error:', response.status, errorText);
+            throw new Error(`Failed to save project: ${response.status}`);
         }
         
         const savedProject = await response.json();
@@ -227,12 +245,17 @@ async function saveProject(isAutoSave = false) {
         AppState.lastSavedData = JSON.stringify(projectData);
         
         updateSaveStatus('saved');
+        console.log('Project saved successfully:', savedProject.id);
         
-        // Очищаем localStorage после успешного сохранения в БД
-        clearLocalStorage();
+        // Сохраняем projectId в localStorage для восстановления после обновления
+        localStorage.setItem(APP_CONFIG.localStorageKey + '_projectId', savedProject.id);
+        
+        // Очищаем черновик из localStorage (фото уже в БД)
+        localStorage.removeItem(APP_CONFIG.localStorageKey);
+        console.log('Draft cleared, projectId saved');
         
         if (!isAutoSave) {
-            console.log('Проект сохранён:', savedProject.id);
+            console.log('Manual save completed, NO NAVIGATION SHOULD HAPPEN');
         }
         
     } catch (error) {
@@ -248,8 +271,67 @@ async function saveProject(isAutoSave = false) {
     }
 }
 
+// Загрузить фото на сервер (для фото с blob URL)
+async function uploadPhotosToServer(token) {
+    const photosToUpload = AppState.photos.filter(p => 
+        p.url && p.url.startsWith('blob:') && !p.serverUrl && (p.file || p.originalFile)
+    );
+    
+    if (photosToUpload.length === 0) {
+        console.log('No photos to upload');
+        return;
+    }
+    
+    console.log(`Uploading ${photosToUpload.length} photos to server...`);
+    
+    for (const photo of photosToUpload) {
+        try {
+            const formData = new FormData();
+            
+            // Отправляем сконвертированный файл (JPEG) если есть, иначе оригинал
+            // photo.file - сконвертированный blob (JPEG)
+            // photo.originalFile - оригинальный файл (может быть HEIC/TIFF)
+            const fileToUpload = photo.file || photo.originalFile;
+            
+            // Имя файла - используем .jpg если файл был сконвертирован
+            let fileName = photo.name;
+            if (photo.file && photo.originalFile && photo.file !== photo.originalFile) {
+                // Был сконвертирован - меняем расширение на .jpg
+                fileName = photo.name.replace(/\.(heic|heif|tiff|tif)$/i, '.jpg');
+            }
+            
+            formData.append('file', fileToUpload, fileName);
+            
+            if (AppState.projectId) {
+                formData.append('project_id', AppState.projectId);
+            }
+            
+            const response = await fetch(`${API_URL}/photos/upload/`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                },
+                body: formData
+            });
+            
+            if (response.ok) {
+                const uploadedPhoto = await response.json();
+                // Сохраняем серверный URL
+                photo.serverUrl = uploadedPhoto.url;
+                photo.serverId = uploadedPhoto.id;
+                console.log('Photo uploaded:', fileName, uploadedPhoto.url);
+            } else {
+                console.error('Failed to upload photo:', photo.name);
+            }
+        } catch (error) {
+            console.error('Photo upload error:', photo.name, error);
+        }
+    }
+}
+
 // Сохранить в localStorage (для гостей или как backup)
 function saveToLocalStorage() {
+    console.log('saveToLocalStorage called');
     try {
         const data = {
             projectId: AppState.projectId,
@@ -269,6 +351,7 @@ function saveToLocalStorage() {
         localStorage.setItem(APP_CONFIG.localStorageKey, JSON.stringify(data));
         AppState.hasUnsavedChanges = false;
         updateSaveStatus('saved');
+        console.log('Saved to localStorage successfully');
         
     } catch (error) {
         console.error('localStorage save error:', error);
@@ -286,7 +369,17 @@ function loadDraft() {
         return;
     }
     
-    // Пробуем загрузить из localStorage
+    // Проверяем сохранённый projectId в localStorage (для авторизованных)
+    const savedProjectId = localStorage.getItem(APP_CONFIG.localStorageKey + '_projectId');
+    const token = localStorage.getItem('access');
+    
+    if (savedProjectId && token) {
+        console.log('Found saved projectId, loading from DB:', savedProjectId);
+        loadProjectFromDB(savedProjectId);
+        return;
+    }
+    
+    // Пробуем загрузить черновик из localStorage (для гостей)
     loadFromLocalStorage();
 }
 
@@ -295,6 +388,8 @@ async function loadProjectFromDB(projectId) {
     const token = localStorage.getItem('access');
     if (!token) {
         console.log('Not authenticated, cannot load project from DB');
+        // Очищаем сохранённый projectId если не авторизованы
+        localStorage.removeItem(APP_CONFIG.localStorageKey + '_projectId');
         return;
     }
     
@@ -306,10 +401,13 @@ async function loadProjectFromDB(projectId) {
         });
         
         if (!response.ok) {
+            // Проект не найден - очищаем сохранённый ID
+            localStorage.removeItem(APP_CONFIG.localStorageKey + '_projectId');
             throw new Error('Failed to load project');
         }
         
         const project = await response.json();
+        console.log('Loaded project:', project);
         
         // Восстанавливаем состояние
         AppState.projectId = project.id;
@@ -321,14 +419,28 @@ async function loadProjectFromDB(projectId) {
         if (nameInput) nameInput.value = AppState.projectName;
         
         // Восстанавливаем фото из данных проекта
-        if (project.data && project.data.photos) {
-            AppState.photos = project.data.photos.map(p => ({
-                ...p,
-                url: p.url // URL с сервера
-            }));
+        if (project.data && project.data.photos && project.data.photos.length > 0) {
+            // Фильтруем фото - оставляем только те у которых есть валидный URL (не blob)
+            const validPhotos = project.data.photos.filter(p => p.url && !p.url.startsWith('blob:'));
+            const blobPhotos = project.data.photos.filter(p => p.url && p.url.startsWith('blob:'));
+            
+            if (validPhotos.length > 0) {
+                AppState.photos = validPhotos.map(p => ({
+                    ...p,
+                    url: p.url
+                }));
+            }
+            
+            // Если были blob URL - предупреждаем что нужно перезагрузить фото
+            if (blobPhotos.length > 0 && validPhotos.length === 0) {
+                console.log('Project has blob URLs, photos need to be re-uploaded');
+                // Восстанавливаем настройки без URL для удобства
+                AppState.photos = [];
+            }
             
             updatePhotosCount();
             renderUploadedPhotos();
+            updateTotalPrice();
             
             if (AppState.photos.length > 0) {
                 document.getElementById('upload-sources').style.display = 'none';
@@ -336,12 +448,13 @@ async function loadProjectFromDB(projectId) {
             }
         }
         
+        AppState.hasUnsavedChanges = false;
         updateSaveStatus('saved');
-        console.log('Project loaded from DB:', projectId);
+        console.log('Project loaded from DB:', projectId, 'Photos:', AppState.photos.length);
         
     } catch (error) {
         console.error('Load project error:', error);
-        alert('Не удалось загрузить проект');
+        // Не показываем alert при ошибке загрузки - просто начинаем новый проект
     }
 }
 
@@ -359,36 +472,26 @@ function loadFromLocalStorage() {
             return;
         }
         
-        // Спрашиваем пользователя
+        // Автоматически восстанавливаем проект без подтверждения
         if (data.photos && data.photos.length > 0) {
-            const restore = confirm(`Найден несохранённый проект "${data.projectName}" (${data.photos.length} фото). Восстановить?`);
+            AppState.projectId = data.projectId;
+            AppState.projectName = data.projectName;
+            AppState.totalPrice = data.totalPrice || 0;
             
-            if (restore) {
-                AppState.projectId = data.projectId;
-                AppState.projectName = data.projectName;
-                AppState.totalPrice = data.totalPrice || 0;
-                
-                const nameInput = document.getElementById('project-name');
-                if (nameInput) nameInput.value = AppState.projectName;
-                
-                // Примечание: blob URL не сохраняются между сессиями
-                // Пользователю придётся перезагрузить фото
-                AppState.photos = data.photos.filter(p => p.url && !p.url.startsWith('blob:'));
-                
-                if (AppState.photos.length < data.photos.length) {
-                    alert('Некоторые фотографии не удалось восстановить. Пожалуйста, загрузите их снова.');
-                }
-                
-                if (AppState.photos.length > 0) {
-                    updatePhotosCount();
-                    renderUploadedPhotos();
-                    document.getElementById('upload-sources').style.display = 'none';
-                    document.getElementById('uploaded-photos').style.display = 'block';
-                }
-                
+            const nameInput = document.getElementById('project-name');
+            if (nameInput) nameInput.value = AppState.projectName;
+            
+            // Примечание: blob URL не сохраняются между сессиями
+            // Восстанавливаем только фото с серверными URL
+            AppState.photos = data.photos.filter(p => p.url && !p.url.startsWith('blob:'));
+            
+            if (AppState.photos.length > 0) {
+                updatePhotosCount();
+                renderUploadedPhotos();
+                document.getElementById('upload-sources').style.display = 'none';
+                document.getElementById('uploaded-photos').style.display = 'block';
                 updateSaveStatus('saved');
-            } else {
-                clearLocalStorage();
+                console.log(`Восстановлен проект: ${data.projectName} (${AppState.photos.length} фото)`);
             }
         }
         
@@ -449,6 +552,9 @@ window.onUserLogin = async function() {
 
 // Инициализация
 document.addEventListener('DOMContentLoaded', () => {
+    console.log('=== print-app.js DOMContentLoaded ===');
+    console.log('Current URL:', window.location.href);
+    
     loadPrintOptions();
     initStepNavigation();
     initUploadSources();
@@ -463,6 +569,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initAutoSave();
     initProjectNameInput();
     loadDraft(); // Загружаем черновик если есть
+    
+    console.log('=== Initialization complete ===');
 });
 
 // ==================== LOAD PRINT OPTIONS ====================
@@ -473,6 +581,11 @@ async function loadPrintOptions() {
         if (!res.ok) throw new Error('Failed to load config');
         
         const config = await res.json();
+        
+        // Сохраняем ID типа продукта для отправки при сохранении
+        if (config.product_type && config.product_type.id) {
+            AppState.productTypeId = config.product_type.id;
+        }
         
         // Парсим размеры - используем width_cm и height_cm из API
         if (config.sizes && config.sizes.length > 0) {
@@ -502,10 +615,12 @@ async function loadPrintOptions() {
         
         console.log('Loaded sizes from API:', AppState.sizes);
         console.log('Loaded papers from API:', AppState.papers);
+        console.log('Product type ID:', AppState.productTypeId);
         
     } catch (e) {
         console.error('Failed to load print options from API:', e);
         // Fallback - дефолтные значения
+        AppState.productTypeId = 1; // prints
         AppState.sizes = [
             { value: '10x15', label: '10 × 15 см', price: 15, width: 10, height: 15, ratio: 1.5 },
             { value: '15x21', label: '15 × 21 см', price: 35, width: 15, height: 21, ratio: 1.4 },
@@ -596,73 +711,7 @@ function getAuthHeaders() {
     return headers;
 }
 
-// Сохранить проект в БД
-async function saveProject() {
-    try {
-        // Обновляем общую стоимость перед сохранением
-        updateTotalPrice();
-        
-        const projectData = {
-            photos: AppState.photos.map(p => ({
-                id: p.id,
-                serverId: p.serverId || null, // ID фото на сервере
-                name: p.name,
-                width: p.width,
-                height: p.height,
-                url: p.url, // пока храним локальный URL
-                settings: p.settings
-            }))
-        };
-        
-        let res;
-        if (AppState.projectId) {
-            // Обновляем существующий проект (без product_type)
-            const body = {
-                name: AppState.projectName,
-                data: projectData,
-                total_price: AppState.totalPrice
-            };
-            res = await fetch(`${API_URL}/projects/${AppState.projectId}/`, {
-                method: 'PUT',
-                headers: getAuthHeaders(),
-                credentials: 'include',
-                body: JSON.stringify(body)
-            });
-        } else {
-            // Создаём новый проект (с product_type)
-            const body = {
-                name: AppState.projectName,
-                product_type: 1, // prints
-                data: projectData,
-                total_price: AppState.totalPrice
-            };
-            res = await fetch(`${API_URL}/projects/`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                credentials: 'include',
-                body: JSON.stringify(body)
-            });
-        }
-        
-        if (!res.ok) {
-            const err = await res.text();
-            console.error('Server response:', err);
-            throw new Error('Failed to save project');
-        }
-        
-        const project = await res.json();
-        AppState.projectId = project.id;
-        
-        console.log('Project saved:', project);
-        return project;
-        
-    } catch (e) {
-        console.error('Failed to save project:', e);
-        throw e;
-    }
-}
-
-// Загрузить фото на сервер
+// Загрузить фото на сервер (старая функция для совместимости)
 async function uploadPhotoToServer(file) {
     try {
         const formData = new FormData();
@@ -725,16 +774,19 @@ async function createOrderFromProject() {
 }
 
 // ==================== ASPECT RATIO HELPERS ====================
-function getImageDimensions(file) {
+function getImageDimensions(fileOrBlob) {
     return new Promise((resolve) => {
+        const url = URL.createObjectURL(fileOrBlob);
         const img = new Image();
         img.onload = () => {
-            resolve({ width: img.width, height: img.height });
+            URL.revokeObjectURL(url);
+            resolve({ width: img.naturalWidth || img.width, height: img.naturalHeight || img.height });
         };
         img.onerror = () => {
+            URL.revokeObjectURL(url);
             resolve({ width: 0, height: 0 });
         };
-        img.src = URL.createObjectURL(file);
+        img.src = url;
     });
 }
 
@@ -793,6 +845,7 @@ function initStepNavigation() {
 }
 
 function goToStep(step) {
+    console.log('goToStep called:', step, 'from:', new Error().stack);
     AppState.currentStep = step;
     
     document.querySelectorAll('.step-item').forEach(item => {
@@ -862,7 +915,6 @@ function initUploadSources() {
 }
 
 async function handleFileUpload(files) {
-    const validFiles = [];
     const errors = [];
     
     for (const file of Array.from(files)) {
@@ -879,7 +931,34 @@ async function handleFileUpload(files) {
             continue;
         }
         
-        validFiles.push(file);
+        try {
+            // Обрабатываем файл (конвертируем HEIC/TIFF если нужно)
+            const processedFile = await processImageFile(file);
+            
+            const id = Date.now() + Math.random().toString(36).substr(2, 9);
+            const url = URL.createObjectURL(processedFile.blob);
+            
+            // Получаем размеры изображения
+            const dimensions = await getImageDimensions(processedFile.blob);
+            const aspectRatio = calculateAspectRatio(dimensions.width, dimensions.height);
+            const orientation = getOrientation(dimensions.width, dimensions.height);
+            
+            AppState.photos.push({
+                id,
+                file: processedFile.blob,
+                originalFile: file, // Сохраняем оригинал для загрузки на сервер
+                url,
+                name: file.name,
+                width: dimensions.width,
+                height: dimensions.height,
+                aspectRatio,
+                orientation,
+                settings: getDefaultSettings(orientation)
+            });
+        } catch (e) {
+            console.error(`Error processing ${file.name}:`, e);
+            errors.push(`${file.name}: не удалось обработать файл`);
+        }
     }
     
     // Показываем ошибки если есть
@@ -887,35 +966,170 @@ async function handleFileUpload(files) {
         alert('Некоторые файлы не были загружены:\n' + errors.join('\n'));
     }
     
-    // Загружаем валидные файлы
-    for (const file of validFiles) {
-        const id = Date.now() + Math.random().toString(36).substr(2, 9);
-        const url = URL.createObjectURL(file);
-        
-        // Получаем размеры изображения
-        const dimensions = await getImageDimensions(file);
-        const aspectRatio = calculateAspectRatio(dimensions.width, dimensions.height);
-        const orientation = getOrientation(dimensions.width, dimensions.height);
-        
-        AppState.photos.push({
-            id,
-            file,
-            url,
-            name: file.name,
-            width: dimensions.width,
-            height: dimensions.height,
-            aspectRatio,
-            orientation,
-            settings: getDefaultSettings(orientation)
-        });
-    }
-    
-    if (validFiles.length > 0) {
+    if (AppState.photos.length > 0) {
         updatePhotosCount();
         renderUploadedPhotos();
         showUploadedPhotos();
         markAsChanged();
     }
+}
+
+// Обработка файла - конвертация HEIC/TIFF в отображаемый формат
+async function processImageFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    
+    // HEIC/HEIF - конвертируем через heic2any
+    if (ext === 'heic' || ext === 'heif' || file.type === 'image/heic' || file.type === 'image/heif') {
+        // Сначала пробуем heic2any
+        if (typeof heic2any !== 'undefined') {
+            try {
+                const result = await heic2any({
+                    blob: file,
+                    toType: 'image/jpeg',
+                    quality: 0.92
+                });
+                const convertedBlob = Array.isArray(result) ? result[0] : result;
+                console.log('HEIC converted successfully');
+                return { blob: convertedBlob, converted: true };
+            } catch (e) {
+                console.warn('heic2any failed, trying canvas fallback:', e.message);
+            }
+        }
+        
+        // Fallback: пробуем через canvas (Safari иногда поддерживает HEIC нативно)
+        try {
+            const canvasBlob = await convertViaCanvas(file);
+            if (canvasBlob) {
+                console.log('HEIC converted via canvas');
+                return { blob: canvasBlob, converted: true };
+            }
+        } catch (e) {
+            console.warn('Canvas fallback failed:', e.message);
+        }
+        
+        // Последний fallback - возвращаем оригинал, может браузер поддержит
+        console.warn('HEIC: returning original file, browser may not display it');
+        return { blob: file, converted: false };
+    }
+    
+    // TIFF - конвертируем через UTIF
+    if (ext === 'tiff' || ext === 'tif' || file.type === 'image/tiff') {
+        if (typeof UTIF !== 'undefined') {
+            try {
+                const convertedBlob = await convertTiffWithUTIF(file);
+                console.log('TIFF converted successfully');
+                return { blob: convertedBlob, converted: true };
+            } catch (e) {
+                console.warn('UTIF conversion failed:', e.message);
+            }
+        }
+        
+        // Fallback через canvas
+        try {
+            const canvasBlob = await convertViaCanvas(file);
+            if (canvasBlob) {
+                return { blob: canvasBlob, converted: true };
+            }
+        } catch (e) {
+            console.warn('Canvas fallback for TIFF failed');
+        }
+        
+        return { blob: file, converted: false };
+    }
+    
+    // Остальные форматы - возвращаем как есть
+    return { blob: file, converted: false };
+}
+
+// Конвертация через canvas (fallback)
+function convertViaCanvas(file) {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                
+                if (canvas.width === 0 || canvas.height === 0) {
+                    URL.revokeObjectURL(url);
+                    resolve(null);
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0);
+                
+                canvas.toBlob((blob) => {
+                    URL.revokeObjectURL(url);
+                    resolve(blob);
+                }, 'image/jpeg', 0.92);
+            } catch (e) {
+                URL.revokeObjectURL(url);
+                resolve(null);
+            }
+        };
+        
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
+        
+        img.src = url;
+    });
+}
+
+// Конвертация TIFF через UTIF библиотеку
+async function convertTiffWithUTIF(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+            try {
+                const buffer = e.target.result;
+                const ifds = UTIF.decode(buffer);
+                
+                if (ifds.length === 0) {
+                    reject(new Error('No pages in TIFF'));
+                    return;
+                }
+                
+                // Декодируем первую страницу
+                UTIF.decodeImage(buffer, ifds[0]);
+                const rgba = UTIF.toRGBA8(ifds[0]);
+                
+                const width = ifds[0].width;
+                const height = ifds[0].height;
+                
+                // Создаём canvas и рисуем
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                
+                const ctx = canvas.getContext('2d');
+                const imageData = ctx.createImageData(width, height);
+                imageData.data.set(new Uint8ClampedArray(rgba));
+                ctx.putImageData(imageData, 0, 0);
+                
+                // Конвертируем в JPEG blob
+                canvas.toBlob((blob) => {
+                    if (blob) {
+                        resolve(blob);
+                    } else {
+                        reject(new Error('Canvas toBlob failed'));
+                    }
+                }, 'image/jpeg', 0.92);
+                
+            } catch (e) {
+                reject(e);
+            }
+        };
+        
+        reader.onerror = () => reject(new Error('FileReader failed'));
+        reader.readAsArrayBuffer(file);
+    });
 }
 
 function getDefaultSettings(orientation) {
@@ -2254,8 +2468,9 @@ async function submitOrder() {
         AppState.hasUnsavedChanges = false;
         AppState.projectStartTime = null;
         
-        // Очищаем localStorage
+        // Очищаем localStorage (черновик и projectId)
         clearLocalStorage();
+        localStorage.removeItem(APP_CONFIG.localStorageKey + '_projectId');
         
         // Обновляем UI
         updatePhotosCount();
@@ -2282,7 +2497,12 @@ function initFooterButtons() {
     const btnSave = document.getElementById('btn-save');
     const btnContinue = document.getElementById('btn-continue');
     
-    btnSave?.addEventListener('click', () => handleSaveProject());
+    btnSave?.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Save button clicked');
+        handleSaveProject();
+    });
     
     btnContinue?.addEventListener('click', () => {
         if (AppState.currentStep === 3) {
@@ -2302,6 +2522,7 @@ function initFooterButtons() {
 }
 
 async function handleSaveProject() {
+    console.log('handleSaveProject started, photos count:', AppState.photos.length);
     AppState.projectName = document.getElementById('project-name')?.value || APP_CONFIG.defaultProjectName;
     
     const btnSave = document.getElementById('btn-save');
@@ -2314,6 +2535,7 @@ async function handleSaveProject() {
         }
         
         await saveProject(false); // false = ручное сохранение
+        console.log('handleSaveProject completed, photos count:', AppState.photos.length);
         
     } finally {
         if (btnSave) {

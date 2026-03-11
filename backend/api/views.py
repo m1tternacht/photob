@@ -7,9 +7,14 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.models import User
 from django.db.models import Q
+from django.http import HttpResponse
+from django.conf import settings as django_settings
+from django.utils.text import slugify
 from decimal import Decimal
 from PIL import Image
 import os
+import io
+import re
 
 from .models import (
     Product, ProductType, PrintSize, PaperType,
@@ -24,8 +29,46 @@ from .serializers import (
     OrderListSerializer, OrderDetailSerializer, OrderItemSerializer
 )
 
+# Попытка импорта pillow-heif для HEIC
+try:
+    import pillow_heif
+    pillow_heif.register_heif_opener()
+    HEIF_SUPPORT = True
+except ImportError:
+    HEIF_SUPPORT = False
+
 
 # ==================== HELPERS ====================
+
+
+def get_print_size_pixels(size_str, dpi=300):
+    """
+    Конвертирует размер печати в пиксели при заданном DPI.
+    10x15 см при 300 DPI = 1181 x 1772 пикселей
+    
+    Args:
+        size_str: строка размера, например "10x15" или "10.0x15.0"
+        dpi: разрешение (по умолчанию 300)
+    
+    Returns:
+        tuple: (width_px, height_px)
+    """
+    try:
+        # Парсим размер
+        size_str = size_str.replace(',', '.')
+        parts = size_str.lower().split('x')
+        width_cm = float(parts[0])
+        height_cm = float(parts[1])
+        
+        # Конвертируем см в пиксели: pixels = cm / 2.54 * dpi
+        width_px = int(round(width_cm / 2.54 * dpi))
+        height_px = int(round(height_cm / 2.54 * dpi))
+        
+        return width_px, height_px
+    except:
+        # По умолчанию 10x15
+        return 1181, 1772
+
 
 def get_user_or_session(request):
     """Получить user или session_key для фильтрации"""
@@ -184,7 +227,7 @@ def project_detail(request, project_id):
 @api_view(['POST'])
 @parser_classes([MultiPartParser, FormParser])
 def photo_upload(request):
-    """Загрузка фото"""
+    """Загрузка фото с автоконвертацией HEIC/TIFF в JPEG"""
     filters = get_user_or_session(request)
     
     file = request.FILES.get('file')
@@ -193,21 +236,58 @@ def photo_upload(request):
     if not file:
         return Response({'detail': 'No file provided'}, status=400)
     
-    # Получаем размеры изображения
+    original_name = file.name
+    
+    # Получаем расширение
+    ext = os.path.splitext(original_name)[1].lower()
+    
     try:
+        # Открываем изображение
         img = Image.open(file)
         width, height = img.size
-        file.seek(0)  # Сбрасываем позицию после чтения
+        
+        # Конвертируем в RGB если нужно (для JPEG)
+        needs_conversion = ext in ['.heic', '.heif', '.tiff', '.tif', '.png', '.bmp', '.webp']
+        
+        if needs_conversion or img.mode not in ('RGB', 'L'):
+            # Конвертируем в RGB
+            if img.mode in ('RGBA', 'LA', 'P'):
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                if img.mode == 'P':
+                    img = img.convert('RGBA')
+                if img.mode in ('RGBA', 'LA'):
+                    background.paste(img, mask=img.split()[-1])
+                else:
+                    background.paste(img)
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
+            
+            # Сохраняем как JPEG
+            output = io.BytesIO()
+            img.save(output, format='JPEG', quality=95, dpi=(300, 300))
+            output.seek(0)
+            
+            # Создаём новый файл
+            from django.core.files.uploadedfile import InMemoryUploadedFile
+            new_name = os.path.splitext(original_name)[0] + '.jpg'
+            file = InMemoryUploadedFile(
+                output, 'file', new_name, 'image/jpeg', output.getbuffer().nbytes, None
+            )
+            original_name = new_name
+        else:
+            file.seek(0)
+        
     except Exception as e:
         return Response({'detail': f'Invalid image: {str(e)}'}, status=400)
     
     # Создаём запись
     photo = Photo.objects.create(
         file=file,
-        original_name=file.name,
+        original_name=original_name,
         width=width,
         height=height,
-        file_size=file.size,
+        file_size=file.size if hasattr(file, 'size') else len(file.read()),
         **filters
     )
     
@@ -317,7 +397,10 @@ def order_detail(request, order_id):
 
 @api_view(['POST'])
 def create_order_from_project(request, project_id):
-    """Создание заказа из проекта"""
+    """Создание заказа из проекта с обработкой фото"""
+    import zipfile
+    from datetime import datetime
+    
     filters = get_user_or_session(request)
     project = get_object_or_404(Project, id=project_id, **filters)
     
@@ -329,7 +412,6 @@ def create_order_from_project(request, project_id):
     )
     
     # Создаём позицию заказа
-    # Формируем описание
     photos_data = project.data.get('photos', [])
     total_photos = sum(p.get('settings', {}).get('quantity', 1) for p in photos_data)
     
@@ -354,11 +436,329 @@ def create_order_from_project(request, project_id):
         total_price=project.total_price
     )
     
+    # Обрабатываем и сохраняем фото в папку заказа
+    process_order_photos(order, project)
+    
     # Обновляем статус проекта
     project.status = 'ordered'
     project.save()
     
     return Response(OrderDetailSerializer(order).data, status=status.HTTP_201_CREATED)
+
+
+def process_order_photos(order, project):
+    """
+    Обрабатывает фото проекта и сохраняет в папку заказа.
+    - Применяет поворот, зум, кроп
+    - Ресайзит до точного размера печати в пикселях (300 DPI)
+    - Сохраняет как JPEG с именем: 001_10x15_x1.jpg
+    """
+    from datetime import datetime
+    
+    photos_data = project.data.get('photos', [])
+    now = datetime.now()
+    
+    # Определяем папку по типу продукта
+    type_folders = {
+        'prints': 'prints',
+        'polaroid': 'polaroid', 
+        'canvas': 'canvas',
+        'photobook': 'photobooks',
+        'calendar': 'calendars',
+    }
+    type_folder = type_folders.get(project.product_type.code, 'other')
+    
+    # Базовая папка: orders/prints/2026/03/11/PB-2026-00001/
+    base_path = os.path.join(
+        django_settings.MEDIA_ROOT,
+        'orders',
+        type_folder,
+        str(now.year),
+        f'{now.month:02d}',
+        f'{now.day:02d}',
+        order.order_number
+    )
+    
+    # Создаём директорию
+    os.makedirs(base_path, exist_ok=True)
+    
+    processed_files = []
+    
+    for i, photo_data in enumerate(photos_data):
+        photo_url = photo_data.get('url', '')
+        photo_settings = photo_data.get('settings', {})
+        
+        # Получаем путь к оригинальному файлу
+        if '/media/' in photo_url:
+            relative_path = photo_url.split('/media/')[-1]
+            source_path = os.path.join(django_settings.MEDIA_ROOT, relative_path)
+            
+            if os.path.exists(source_path):
+                try:
+                    # Открываем изображение
+                    img = Image.open(source_path)
+                    
+                    # Применяем поворот
+                    rotation = photo_settings.get('rotation', 0)
+                    if rotation == 90:
+                        img = img.transpose(Image.ROTATE_270)
+                    elif rotation == 180:
+                        img = img.transpose(Image.ROTATE_180)
+                    elif rotation == 270:
+                        img = img.transpose(Image.ROTATE_90)
+                    
+                    # Получаем целевой размер в пикселях
+                    size_str = photo_settings.get('size', '10x15')
+                    target_w, target_h = get_print_size_pixels(size_str, dpi=300)
+                    target_ratio = target_w / target_h
+                    
+                    # Применяем кроп если есть
+                    crop = photo_settings.get('crop')
+                    img_w, img_h = img.size
+                    
+                    if crop:
+                        # Применяем зум (в JS это проценты: 100 = 1x)
+                        zoom = crop.get('zoom', 100) / 100.0
+                        if zoom != 1.0:
+                            new_w = int(img_w * zoom)
+                            new_h = int(img_h * zoom)
+                            img = img.resize((new_w, new_h), Image.LANCZOS)
+                            img_w, img_h = img.size
+                        
+                        # Координаты кропа (смещение от центра в пикселях)
+                        cx = crop.get('x', 0)
+                        cy = crop.get('y', 0)
+                    else:
+                        cx, cy = 0, 0
+                    
+                    # Вычисляем область кропа на основе соотношения сторон печати
+                    img_ratio = img_w / img_h
+                    
+                    if img_ratio > target_ratio:
+                        # Изображение шире - обрезаем по бокам
+                        crop_h = img_h
+                        crop_w = int(crop_h * target_ratio)
+                    else:
+                        # Изображение выше - обрезаем сверху/снизу
+                        crop_w = img_w
+                        crop_h = int(crop_w / target_ratio)
+                    
+                    # Центр + смещение
+                    center_x = img_w // 2
+                    center_y = img_h // 2
+                    
+                    left = max(0, center_x - crop_w // 2 + int(cx))
+                    top = max(0, center_y - crop_h // 2 + int(cy))
+                    right = min(img_w, left + crop_w)
+                    bottom = min(img_h, top + crop_h)
+                    
+                    # Корректируем если вышли за границы
+                    if right - left < crop_w:
+                        if left == 0:
+                            right = min(img_w, crop_w)
+                        else:
+                            left = max(0, right - crop_w)
+                    if bottom - top < crop_h:
+                        if top == 0:
+                            bottom = min(img_h, crop_h)
+                        else:
+                            top = max(0, bottom - crop_h)
+                    
+                    if right > left and bottom > top:
+                        img = img.crop((left, top, right, bottom))
+                    
+                    # Ресайзим до точного размера печати
+                    img = img.resize((target_w, target_h), Image.LANCZOS)
+                    
+                    # Конвертируем в RGB
+                    if img.mode in ('RGBA', 'LA', 'P'):
+                        background = Image.new('RGB', img.size, (255, 255, 255))
+                        if img.mode == 'P':
+                            img = img.convert('RGBA')
+                        if 'A' in img.mode:
+                            background.paste(img, mask=img.split()[-1])
+                        else:
+                            background.paste(img)
+                        img = background
+                    elif img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    
+                    # Формируем имя файла: 001_10x15_x1.jpg
+                    size_clean = size_str.replace('.', '_').replace(',', '_')
+                    quantity = photo_settings.get('quantity', 1)
+                    filename = f"{i+1:03d}_{size_clean}_x{quantity}.jpg"
+                    
+                    # Сохраняем с DPI 300
+                    output_path = os.path.join(base_path, filename)
+                    img.save(output_path, 'JPEG', quality=95, dpi=(300, 300))
+                    
+                    processed_files.append(filename)
+                    
+                except Exception as e:
+                    print(f"Error processing photo {i}: {e}")
+    
+    return processed_files
+
+
+@api_view(['GET'])
+def download_order_photos(request, order_id):
+    """Скачивание всех фото заказа архивом с обработкой"""
+    import zipfile
+    from datetime import datetime
+    
+    # Проверяем права (админ или владелец)
+    if not request.user.is_authenticated:
+        return Response({'detail': 'Authentication required'}, status=401)
+    
+    if not request.user.is_staff:
+        order = get_object_or_404(Order, id=order_id, user=request.user)
+    else:
+        order = get_object_or_404(Order, id=order_id)
+    
+    # Ищем папку с обработанными фото
+    for item in order.items.all():
+        if not item.project:
+            continue
+        
+        project = item.project
+        photos_data = project.data.get('photos', [])
+        
+        if not photos_data:
+            continue
+        
+        # Создаём ZIP архив в памяти
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            type_folders = {
+                'prints': 'prints',
+                'polaroid': 'polaroid',
+                'canvas': 'canvas',
+                'photobook': 'photobooks',
+                'calendar': 'calendars',
+            }
+            type_folder = type_folders.get(project.product_type.code, 'other')
+            
+            # Пробуем найти папку заказа
+            order_date = order.created_at
+            base_path = os.path.join(
+                django_settings.MEDIA_ROOT,
+                'orders',
+                type_folder,
+                str(order_date.year),
+                f'{order_date.month:02d}',
+                f'{order_date.day:02d}',
+                order.order_number
+            )
+            
+            if os.path.exists(base_path):
+                # Добавляем все файлы из папки заказа
+                for filename in os.listdir(base_path):
+                    file_path = os.path.join(base_path, filename)
+                    if os.path.isfile(file_path):
+                        zip_file.write(file_path, filename)
+            else:
+                # Если папки нет - обрабатываем фото на лету
+                for i, photo_data in enumerate(photos_data):
+                    photo_url = photo_data.get('url', '')
+                    photo_settings = photo_data.get('settings', {})
+                    
+                    if '/media/' in photo_url:
+                        relative_path = photo_url.split('/media/')[-1]
+                        source_path = os.path.join(django_settings.MEDIA_ROOT, relative_path)
+                        
+                        if os.path.exists(source_path):
+                            try:
+                                img = Image.open(source_path)
+                                
+                                # Применяем поворот
+                                rotation = photo_settings.get('rotation', 0)
+                                if rotation == 90:
+                                    img = img.transpose(Image.ROTATE_270)
+                                elif rotation == 180:
+                                    img = img.transpose(Image.ROTATE_180)
+                                elif rotation == 270:
+                                    img = img.transpose(Image.ROTATE_90)
+                                
+                                # Получаем целевой размер
+                                size_str = photo_settings.get('size', '10x15')
+                                target_w, target_h = get_print_size_pixels(size_str, dpi=300)
+                                target_ratio = target_w / target_h
+                                
+                                # Применяем кроп
+                                img_w, img_h = img.size
+                                crop = photo_settings.get('crop')
+                                
+                                if crop:
+                                    zoom = crop.get('zoom', 100) / 100.0
+                                    if zoom != 1.0:
+                                        new_w = int(img_w * zoom)
+                                        new_h = int(img_h * zoom)
+                                        img = img.resize((new_w, new_h), Image.LANCZOS)
+                                        img_w, img_h = img.size
+                                    cx = crop.get('x', 0)
+                                    cy = crop.get('y', 0)
+                                else:
+                                    cx, cy = 0, 0
+                                
+                                # Вычисляем область кропа
+                                img_ratio = img_w / img_h
+                                if img_ratio > target_ratio:
+                                    crop_h = img_h
+                                    crop_w = int(crop_h * target_ratio)
+                                else:
+                                    crop_w = img_w
+                                    crop_h = int(crop_w / target_ratio)
+                                
+                                center_x = img_w // 2
+                                center_y = img_h // 2
+                                left = max(0, center_x - crop_w // 2 + int(cx))
+                                top = max(0, center_y - crop_h // 2 + int(cy))
+                                right = min(img_w, left + crop_w)
+                                bottom = min(img_h, top + crop_h)
+                                
+                                if right > left and bottom > top:
+                                    img = img.crop((left, top, right, bottom))
+                                
+                                # Ресайзим до точного размера
+                                img = img.resize((target_w, target_h), Image.LANCZOS)
+                                
+                                # Конвертируем в RGB
+                                if img.mode not in ('RGB',):
+                                    if img.mode in ('RGBA', 'LA', 'P'):
+                                        background = Image.new('RGB', img.size, (255, 255, 255))
+                                        if img.mode == 'P':
+                                            img = img.convert('RGBA')
+                                        if 'A' in img.mode:
+                                            background.paste(img, mask=img.split()[-1])
+                                        else:
+                                            background.paste(img)
+                                        img = background
+                                    else:
+                                        img = img.convert('RGB')
+                                
+                                # Сохраняем в буфер
+                                img_buffer = io.BytesIO()
+                                img.save(img_buffer, 'JPEG', quality=95, dpi=(300, 300))
+                                img_buffer.seek(0)
+                                
+                                # Имя файла: 001_10x15_x1.jpg
+                                size_clean = size_str.replace('.', '_').replace(',', '_')
+                                quantity = photo_settings.get('quantity', 1)
+                                filename = f"{i+1:03d}_{size_clean}_x{quantity}.jpg"
+                                
+                                zip_file.writestr(filename, img_buffer.getvalue())
+                                
+                            except Exception as e:
+                                print(f"Error processing photo for zip: {e}")
+        
+        zip_buffer.seek(0)
+        
+        response = HttpResponse(zip_buffer.getvalue(), content_type='application/zip')
+        response['Content-Disposition'] = f'attachment; filename="{order.order_number}.zip"'
+        return response
+    
+    return Response({'detail': 'No photos found'}, status=404)
 
 
 # ==================== LEGACY CART (для обратной совместимости) ====================

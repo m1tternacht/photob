@@ -22,7 +22,14 @@ class PaperTypeInline(admin.TabularInline):
 class OrderItemInline(admin.TabularInline):
     model = OrderItem
     extra = 0
-    readonly_fields = ['product_type', 'description', 'quantity', 'unit_price', 'total_price']
+    readonly_fields = ['project_short_id', 'product_type', 'description', 'quantity', 'unit_price', 'total_price']
+    fields = ['project_short_id', 'product_type', 'description', 'quantity', 'unit_price', 'total_price']
+    
+    def project_short_id(self, obj):
+        if obj.project:
+            return obj.project.get_short_id()
+        return '-'
+    project_short_id.short_description = 'ID проекта'
 
 
 class PhotoInline(admin.TabularInline):
@@ -103,15 +110,48 @@ class PhotoAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ['order_number', 'user', 'status', 'total_price', 'created_at']
+    list_display = ['order_number', 'user', 'get_projects_ids', 'status', 'total_price', 'created_at', 'download_button']
     list_filter = ['status', 'created_at']
     search_fields = ['order_number', 'user__username', 'customer_email']
-    readonly_fields = ['order_number', 'created_at', 'updated_at']
+    readonly_fields = ['order_number', 'created_at', 'updated_at', 'download_link']
     inlines = [OrderItemInline]
+    
+    def get_projects_ids(self, obj):
+        """Получить короткие ID всех проектов в заказе"""
+        items = obj.items.select_related('project').all()
+        ids = []
+        for item in items:
+            if item.project:
+                ids.append(item.project.get_short_id())
+        return ', '.join(ids) if ids else '-'
+    get_projects_ids.short_description = 'Проекты'
+    
+    def download_button(self, obj):
+        """Кнопка скачивания в списке"""
+        from django.utils.html import format_html
+        return format_html(
+            '<a href="/api/orders/{}/download/" target="_blank" title="Скачать архив">📦</a>',
+            obj.pk
+        )
+    download_button.short_description = '📦'
+    
+    def download_link(self, obj):
+        """Ссылка на скачивание архива в детальной странице"""
+        from django.utils.html import format_html
+        if obj.pk:
+            return format_html(
+                '<a class="button" href="/api/orders/{}/download/" target="_blank" '
+                'style="padding: 10px 20px; background: #417690; color: white; '
+                'text-decoration: none; border-radius: 4px;">'
+                '📦 Скачать архив с фото</a>',
+                obj.pk
+            )
+        return '-'
+    download_link.short_description = 'Скачать фото'
     
     fieldsets = (
         (None, {
-            'fields': ('order_number', 'status', 'total_price')
+            'fields': ('order_number', 'status', 'total_price', 'download_link')
         }),
         ('Владелец', {
             'fields': ('user', 'session_key')

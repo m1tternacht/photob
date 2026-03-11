@@ -1,110 +1,82 @@
-# Photobond Backend
+# Обновление бэкенда - Обработка фото для печати
 
-Django REST API для Photobond.
+## Новые функции:
 
-## Установка
+### 1. Автоконвертация при загрузке
+- HEIC, TIFF, PNG, BMP, WebP автоматически конвертируются в JPEG
+- Устанавливается DPI 300
 
+### 2. Обработка фото при создании заказа
+- Применяется поворот
+- Применяется кроп/зум
+- Сохраняется в JPEG с DPI 300
+- Структура папок: `media/orders/{тип}/{год}/{месяц}/{день}/{номер_заказа}/`
+
+### 3. Скачивание архивом
+- Endpoint: `GET /api/orders/{id}/download/`
+- Кнопка в админке Django
+
+## Установка:
+
+### 1. Установить зависимости для HEIC:
 ```bash
-cd backend
-pip install django djangorestframework djangorestframework-simplejwt django-cors-headers pillow
+pip install pillow-heif
 ```
 
-## Первый запуск
+### 2. Скопировать файлы:
+```
+views.py -> backend/api/views.py
+urls.py -> backend/api/urls.py  
+admin.py -> backend/api/admin.py
+utils.py -> backend/api/utils.py (новый файл)
+```
 
+### 3. Создать папку для заказов:
 ```bash
-# Применить миграции
-python manage.py makemigrations
-python manage.py migrate
-
-# Загрузить начальные данные (размеры, бумага, типы продуктов)
-python manage.py loaddata initial_data
-
-# Создать суперпользователя для админки
-python manage.py createsuperuser
-
-# Запустить сервер
-python manage.py runserver
+mkdir -p media/orders
 ```
 
-## API Endpoints
-
-### Auth
-- `POST /api/auth/register/` - Регистрация
-- `POST /api/auth/login/` - Вход (получение JWT токенов)
-- `POST /api/auth/refresh/` - Обновление токена
-- `GET /api/auth/me/` - Текущий пользователь
-- `POST /api/auth/merge/` - Объединение данных сессии с пользователем
-
-### Config
-- `GET /api/product-types/` - Список типов продуктов
-- `GET /api/product-types/{code}/` - Детали типа продукта с размерами и бумагой
-- `GET /api/config/` - Конфиг для фотопечати (размеры, бумага, цены)
-- `GET /api/config/{product_code}/` - Конфиг для конкретного продукта
-
-### Projects
-- `GET /api/projects/` - Список проектов
-- `POST /api/projects/` - Создать проект
-- `GET /api/projects/{id}/` - Детали проекта
-- `PUT /api/projects/{id}/` - Обновить проект
-- `DELETE /api/projects/{id}/` - Удалить проект
-- `POST /api/projects/{id}/checkout/` - Создать заказ из проекта
-
-### Photos
-- `POST /api/photos/upload/` - Загрузить одно фото
-- `POST /api/photos/upload-multiple/` - Загрузить несколько фото
-- `DELETE /api/photos/{id}/` - Удалить фото
-
-### Orders
-- `GET /api/orders/` - Список заказов (требует авторизации)
-- `GET /api/orders/{id}/` - Детали заказа
-
-## Структура данных проекта (JSON)
-
-### Фотопечать (prints)
-```json
-{
-    "photos": [
-        {
-            "id": "uuid",
-            "settings": {
-                "size": "10x15",
-                "paper": "glossy",
-                "quantity": 2,
-                "frame": "none",
-                "frameSize": 3,
-                "crop": {"x": 0, "y": 0, "zoom": 100},
-                "rotation": 0,
-                "filter": "original",
-                "fullImage": false
-            }
-        }
-    ]
-}
+## Структура папок заказов:
+```
+media/
+  orders/
+    prints/
+      2026/
+        03/
+          11/
+            PB-2026-00001/
+              001_photo_10x15_x1.jpg
+              002_photo_15x21_x2.jpg
+    polaroid/
+      ...
+    canvas/
+      ...
 ```
 
-### Фотокнига (photobook)
-```json
-{
-    "cover": {
-        "type": "hardcover",
-        "color": "#ffffff"
-    },
-    "pages": [
-        {
-            "layout": "single",
-            "photos": [{"id": "uuid", "position": {...}}]
-        }
-    ]
-}
+## API Endpoints:
+
+### Загрузка фото (обновлён):
+```
+POST /api/photos/upload/
+- Автоконвертация HEIC/TIFF в JPEG
+- Установка DPI 300
 ```
 
-## Django Admin
+### Создание заказа (обновлён):
+```
+POST /api/projects/{id}/checkout/
+- Обрабатывает все фото проекта
+- Применяет кроп, зум, поворот
+- Сохраняет в папку заказа
+```
 
-Админка доступна по адресу `/admin/`
+### Скачивание архива (новый):
+```
+GET /api/orders/{id}/download/
+- Возвращает ZIP с обработанными фото
+- Доступен для владельца или админа
+```
 
-Можно управлять:
-- Типами продуктов
-- Размерами печати и ценами
-- Типами бумаги и коэффициентами
-- Проектами пользователей
-- Заказами
+## Админка:
+- В списке заказов появилась колонка 📦 со ссылкой на скачивание
+- В детальной странице заказа кнопка "Скачать архив с фото"

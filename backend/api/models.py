@@ -1,6 +1,60 @@
 from django.contrib.auth.models import User
 from django.db import models
 import uuid
+import re
+import os
+
+
+# Таблица транслитерации кириллицы
+TRANSLIT_TABLE = {
+    'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo',
+    'ж': 'zh', 'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm',
+    'н': 'n', 'о': 'o', 'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u',
+    'ф': 'f', 'х': 'h', 'ц': 'ts', 'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '',
+    'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu', 'я': 'ya',
+    'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo',
+    'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M',
+    'Н': 'N', 'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U',
+    'Ф': 'F', 'Х': 'H', 'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sch', 'Ъ': '',
+    'Ы': 'Y', 'Ь': '', 'Э': 'E', 'Ю': 'Yu', 'Я': 'Ya', ' ': '_'
+}
+
+
+def transliterate(text):
+    """Транслитерация кириллицы в латиницу для безопасных путей файлов"""
+    result = ''
+    for char in text:
+        result += TRANSLIT_TABLE.get(char, char)
+    # Убираем спецсимволы, оставляем только буквы, цифры, _, -
+    result = re.sub(r'[^a-zA-Z0-9_\-]', '', result)
+    return result[:50] or 'project'  # Ограничиваем длину
+
+
+def photo_upload_path(instance, filename):
+    """
+    Генерирует путь для загрузки фото:
+    projects/{username}/{project_name}/{filename}
+    или
+    photos/{year}/{month}/{filename} если нет пользователя
+    """
+    from datetime import datetime
+    
+    # Безопасное имя файла
+    safe_filename = re.sub(r'[^\w\.\-]', '_', filename)
+    
+    if instance.user:
+        username = instance.user.username
+        
+        if instance.project:
+            project_name = transliterate(instance.project.name)
+            return os.path.join('projects', username, project_name, safe_filename)
+        else:
+            # Фото без проекта - в папку пользователя
+            return os.path.join('projects', username, 'uploads', safe_filename)
+    else:
+        # Гость - по дате
+        now = datetime.now()
+        return os.path.join('photos', str(now.year), f'{now.month:02d}', safe_filename)
 
 
 # ==================== PRODUCT TYPES ====================
@@ -118,7 +172,7 @@ class Photo(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='photos', null=True, blank=True)
     session_key = models.CharField(max_length=40, null=True, blank=True)
     
-    file = models.ImageField(upload_to='photos/%Y/%m/')
+    file = models.ImageField(upload_to=photo_upload_path)
     original_name = models.CharField(max_length=255)
     width = models.IntegerField()
     height = models.IntegerField()

@@ -29,6 +29,7 @@ urlpatterns = [
     # Orders
     path('orders/', views.order_list),
     path('orders/<int:order_id>/', views.order_detail),
+    path('orders/<int:order_id>/download/', views.download_order_photos),
     
     # Legacy
     path('products/', views.product_list),
