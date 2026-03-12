@@ -39,8 +39,13 @@ def photo_upload_path(instance, filename):
     """
     from datetime import datetime
     
-    # Безопасное имя файла
-    safe_filename = re.sub(r'[^\w\.\-]', '_', filename)
+    # Транслитерируем имя файла (кириллица → латиница)
+    name, ext = os.path.splitext(filename)
+    safe_name = transliterate(name)
+    # Убираем спецсимволы кроме _, -
+    safe_name = re.sub(r'[^\w\-]', '_', safe_name)
+    safe_name = re.sub(r'_+', '_', safe_name).strip('_')  # Убираем дублирующиеся _
+    safe_filename = f"{safe_name}{ext.lower()}" if safe_name else f"photo{ext.lower()}"
     
     if instance.user:
         username = instance.user.username

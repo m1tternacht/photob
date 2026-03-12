@@ -10,6 +10,7 @@ from django.db.models import Q
 from django.http import HttpResponse
 from django.conf import settings as django_settings
 from django.utils.text import slugify
+from urllib.parse import unquote
 from decimal import Decimal
 from PIL import Image
 import os
@@ -281,24 +282,24 @@ def photo_upload(request):
     except Exception as e:
         return Response({'detail': f'Invalid image: {str(e)}'}, status=400)
     
-    # Создаём запись
+    # Получаем проект если указан
+    project = None
+    if project_id:
+        try:
+            project = Project.objects.get(id=project_id, **filters)
+        except Project.DoesNotExist:
+            pass
+    
+    # Создаём запись (project передаём сразу, чтобы файл сохранился в правильную папку)
     photo = Photo.objects.create(
         file=file,
         original_name=original_name,
         width=width,
         height=height,
         file_size=file.size if hasattr(file, 'size') else len(file.read()),
+        project=project,
         **filters
     )
-    
-    # Привязываем к проекту если указан
-    if project_id:
-        try:
-            project = Project.objects.get(id=project_id, **filters)
-            photo.project = project
-            photo.save()
-        except Project.DoesNotExist:
-            pass
     
     serializer = PhotoSerializer(photo, context={'request': request})
     return Response(serializer.data, status=status.HTTP_201_CREATED)
@@ -395,6 +396,28 @@ def order_detail(request, order_id):
     return Response(serializer.data)
 
 
+def clean_size_string(size_str):
+    """
+    Очищает строку размера от .0
+    '10.0x15.0' -> '10x15'
+    '10,0x15,0' -> '10x15'
+    """
+    size_str = size_str.replace(',', '.')
+    parts = size_str.split('x')
+    clean_parts = []
+    for p in parts:
+        try:
+            num = float(p)
+            # Если целое число - убираем .0
+            if num == int(num):
+                clean_parts.append(str(int(num)))
+            else:
+                clean_parts.append(str(num))
+        except:
+            clean_parts.append(p)
+    return 'x'.join(clean_parts)
+
+
 @api_view(['POST'])
 def create_order_from_project(request, project_id):
     """Создание заказа из проекта с обработкой фото"""
@@ -415,12 +438,13 @@ def create_order_from_project(request, project_id):
     photos_data = project.data.get('photos', [])
     total_photos = sum(p.get('settings', {}).get('quantity', 1) for p in photos_data)
     
-    # Собираем размеры
+    # Собираем размеры (очищаем от .0)
     sizes = {}
     for p in photos_data:
         size = p.get('settings', {}).get('size', '10x15')
+        size_clean = clean_size_string(size)
         qty = p.get('settings', {}).get('quantity', 1)
-        sizes[size] = sizes.get(size, 0) + qty
+        sizes[size_clean] = sizes.get(size_clean, 0) + qty
     
     sizes_str = ', '.join([f"{size} ({qty} шт.)" for size, qty in sizes.items()])
     description = f"Фотопечать: {sizes_str}"
@@ -491,7 +515,13 @@ def process_order_photos(order, project):
         # Получаем путь к оригинальному файлу
         if '/media/' in photo_url:
             relative_path = photo_url.split('/media/')[-1]
+            # Декодируем URL-encoded символы (кириллица и т.д.)
+            relative_path = unquote(relative_path)
             source_path = os.path.join(django_settings.MEDIA_ROOT, relative_path)
+            
+            print(f"Processing photo {i+1}: {photo_url}")
+            print(f"  Source path: {source_path}")
+            print(f"  Exists: {os.path.exists(source_path)}")
             
             if os.path.exists(source_path):
                 try:
@@ -584,7 +614,7 @@ def process_order_photos(order, project):
                         img = img.convert('RGB')
                     
                     # Формируем имя файла: 001_10x15_x1.jpg
-                    size_clean = size_str.replace('.', '_').replace(',', '_')
+                    size_clean = clean_size_string(size_str)
                     quantity = photo_settings.get('quantity', 1)
                     filename = f"{i+1:03d}_{size_clean}_x{quantity}.jpg"
                     
@@ -606,14 +636,16 @@ def download_order_photos(request, order_id):
     import zipfile
     from datetime import datetime
     
-    # Проверяем права (админ или владелец)
+    # Проверяем права (админ с session auth или владелец с JWT)
+    # Django admin использует session authentication
     if not request.user.is_authenticated:
         return Response({'detail': 'Authentication required'}, status=401)
     
-    if not request.user.is_staff:
-        order = get_object_or_404(Order, id=order_id, user=request.user)
-    else:
+    # Админ может скачать любой заказ, обычный пользователь - только свой
+    if request.user.is_staff:
         order = get_object_or_404(Order, id=order_id)
+    else:
+        order = get_object_or_404(Order, id=order_id, user=request.user)
     
     # Ищем папку с обработанными фото
     for item in order.items.all():
@@ -665,6 +697,7 @@ def download_order_photos(request, order_id):
                     
                     if '/media/' in photo_url:
                         relative_path = photo_url.split('/media/')[-1]
+                        relative_path = unquote(relative_path)
                         source_path = os.path.join(django_settings.MEDIA_ROOT, relative_path)
                         
                         if os.path.exists(source_path):
@@ -743,7 +776,7 @@ def download_order_photos(request, order_id):
                                 img_buffer.seek(0)
                                 
                                 # Имя файла: 001_10x15_x1.jpg
-                                size_clean = size_str.replace('.', '_').replace(',', '_')
+                                size_clean = clean_size_string(size_str)
                                 quantity = photo_settings.get('quantity', 1)
                                 filename = f"{i+1:03d}_{size_clean}_x{quantity}.jpg"
                                 

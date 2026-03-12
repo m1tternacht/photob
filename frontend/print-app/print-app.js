@@ -184,22 +184,50 @@ async function saveProject(isAutoSave = false) {
     updateSaveStatus('saving');
     
     try {
-        // Сначала загружаем фото на сервер (если есть blob URL)
-        await uploadPhotosToServer(token);
-        
         // Обновляем общую стоимость перед сохранением
         updateTotalPrice();
         
+        // ШАГ 1: Если нет projectId - сначала создаём проект (чтобы фото сохранились в правильную папку)
+        if (!AppState.projectId) {
+            const initialProjectData = {
+                name: AppState.projectName,
+                product_type: AppState.productTypeId || 1,
+                data: { photos: [] },
+                total_price: 0
+            };
+            
+            const createResponse = await fetch(`${API_URL}/projects/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(initialProjectData)
+            });
+            
+            if (!createResponse.ok) {
+                throw new Error('Failed to create project');
+            }
+            
+            const createdProject = await createResponse.json();
+            AppState.projectId = createdProject.id;
+            console.log('Project created:', AppState.projectId);
+        }
+        
+        // ШАГ 2: Загружаем фото на сервер (теперь с projectId)
+        await uploadPhotosToServer(token);
+        
+        // ШАГ 3: Обновляем проект с данными фото
         const projectData = {
             name: AppState.projectName,
-            product_type: AppState.productTypeId || 1, // ID типа продукта
+            product_type: AppState.productTypeId || 1,
             data: {
                 photos: AppState.photos.map(p => ({
                     id: p.id,
                     name: p.name,
                     width: p.width,
                     height: p.height,
-                    url: p.serverUrl || p.url, // Используем серверный URL если есть
+                    url: p.serverUrl || p.url,
                     settings: p.settings
                 }))
             },
@@ -209,29 +237,14 @@ async function saveProject(isAutoSave = false) {
         
         console.log('Saving project data:', projectData);
         
-        let response;
-        
-        if (AppState.projectId) {
-            // Обновляем существующий проект
-            response = await fetch(`${API_URL}/projects/${AppState.projectId}/`, {
-                method: 'PUT',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(projectData)
-            });
-        } else {
-            // Создаём новый проект
-            response = await fetch(`${API_URL}/projects/`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(projectData)
-            });
-        }
+        const response = await fetch(`${API_URL}/projects/${AppState.projectId}/`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify(projectData)
+        });
         
         if (!response.ok) {
             const errorText = await response.text();
@@ -240,7 +253,6 @@ async function saveProject(isAutoSave = false) {
         }
         
         const savedProject = await response.json();
-        AppState.projectId = savedProject.id;
         AppState.hasUnsavedChanges = false;
         AppState.lastSavedData = JSON.stringify(projectData);
         
@@ -267,6 +279,7 @@ async function saveProject(isAutoSave = false) {
         
         if (!isAutoSave) {
             alert('Не удалось сохранить проект. Изменения сохранены локально.');
+        }
         }
     }
 }
