@@ -282,7 +282,7 @@ async function saveProject(isAutoSave = false) {
         }
         }
     }
-}
+
 
 // Загрузить фото на сервер (для фото с blob URL)
 async function uploadPhotosToServer(token) {

@@ -270,6 +270,41 @@ async function saveProject() {
         // Обновляем общую стоимость перед сохранением
         updateTotalPrice();
 
+        const token = localStorage.getItem('access');
+        if (!token) {
+            console.log('No token, cannot save to server');
+            return null;
+        }
+
+        // ШАГ 1: Если нет projectId - сначала создаём проект
+        if (!AppState.projectId) {
+            const initialProjectData = {
+                name: AppState.projectName,
+                product_type: 4, // polaroid
+                data: { photos: [] },
+                total_price: 0
+            };
+            
+            const createRes = await fetch(`${API_URL}/projects/`, {
+                method: 'POST',
+                headers: getAuthHeaders(),
+                credentials: 'include',
+                body: JSON.stringify(initialProjectData)
+            });
+            
+            if (!createRes.ok) {
+                throw new Error('Failed to create project');
+            }
+            
+            const createdProject = await createRes.json();
+            AppState.projectId = createdProject.id;
+            console.log('Project created:', AppState.projectId);
+        }
+
+        // ШАГ 2: Загружаем фото на сервер (теперь с projectId)
+        await uploadPhotosToServer();
+
+        // ШАГ 3: Обновляем проект с данными фото
         const projectData = {
             photos: AppState.photos.map(p => ({
                 id: p.id,
@@ -277,40 +312,24 @@ async function saveProject() {
                 name: p.name,
                 width: p.width,
                 height: p.height,
-                url: p.url,
+                url: p.serverUrl || p.url,
                 settings: p.settings
             }))
         };
 
-        let res;
-        if (AppState.projectId) {
-            // Обновляем существующий проект (без product_type)
-            const body = {
-                name: AppState.projectName,
-                data: projectData,
-                total_price: AppState.totalPrice
-            };
-            res = await fetch(`${API_URL}/projects/${AppState.projectId}/`, {
-                method: 'PUT',
-                headers: getAuthHeaders(),
-                credentials: 'include',
-                body: JSON.stringify(body)
-            });
-        } else {
-            // Создаём новый проект (с product_type)
-            const body = {
-                name: AppState.projectName,
-                product_type: 4, // polaroid
-                data: projectData,
-                total_price: AppState.totalPrice
-            };
-            res = await fetch(`${API_URL}/projects/`, {
-                method: 'POST',
-                headers: getAuthHeaders(),
-                credentials: 'include',
-                body: JSON.stringify(body)
-            });
-        }
+        const body = {
+            name: AppState.projectName,
+            data: projectData,
+            total_price: AppState.totalPrice,
+            preview_url: AppState.photos[0]?.serverUrl || AppState.photos[0]?.url || null
+        };
+        
+        const res = await fetch(`${API_URL}/projects/${AppState.projectId}/`, {
+            method: 'PUT',
+            headers: getAuthHeaders(),
+            credentials: 'include',
+            body: JSON.stringify(body)
+        });
 
         if (!res.ok) {
             const err = await res.text();
@@ -319,8 +338,6 @@ async function saveProject() {
         }
 
         const project = await res.json();
-        AppState.projectId = project.id;
-
         console.log('Project saved:', project);
         return project;
 
@@ -330,7 +347,63 @@ async function saveProject() {
     }
 }
 
-// Загрузить фото на сервер
+// Загрузить все фото на сервер
+async function uploadPhotosToServer() {
+    const token = localStorage.getItem('access');
+    if (!token) return;
+
+    const photosToUpload = AppState.photos.filter(p => 
+        p.url && p.url.startsWith('blob:') && !p.serverUrl && (p.file || p.originalFile)
+    );
+    
+    if (photosToUpload.length === 0) {
+        console.log('No photos to upload');
+        return;
+    }
+    
+    console.log(`Uploading ${photosToUpload.length} photos to server...`);
+    
+    for (const photo of photosToUpload) {
+        try {
+            const formData = new FormData();
+            
+            // Отправляем сконвертированный файл (JPEG) если есть
+            const fileToUpload = photo.file || photo.originalFile;
+            
+            // Имя файла - меняем расширение на .jpg если был сконвертирован
+            let fileName = photo.name;
+            if (photo.file && photo.originalFile && photo.file !== photo.originalFile) {
+                fileName = photo.name.replace(/\.(heic|heif|tiff|tif)$/i, '.jpg');
+            }
+            
+            formData.append('file', fileToUpload, fileName);
+            
+            if (AppState.projectId) {
+                formData.append('project_id', AppState.projectId);
+            }
+            
+            const res = await fetch(`${API_URL}/photos/upload/`, {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${token}` },
+                credentials: 'include',
+                body: formData
+            });
+            
+            if (res.ok) {
+                const uploadedPhoto = await res.json();
+                photo.serverUrl = uploadedPhoto.url;
+                photo.serverId = uploadedPhoto.id;
+                console.log('Photo uploaded:', fileName, uploadedPhoto.url);
+            } else {
+                console.error('Failed to upload photo:', photo.name);
+            }
+        } catch (error) {
+            console.error('Photo upload error:', photo.name, error);
+        }
+    }
+}
+
+// Загрузить одно фото на сервер (legacy, для совместимости)
 async function uploadPhotoToServer(file) {
     try {
         const formData = new FormData();
@@ -393,16 +466,18 @@ async function createOrderFromProject() {
 }
 
 // ==================== ASPECT RATIO HELPERS ====================
-function getImageDimensions(file) {
+function getImageDimensions(fileOrBlob) {
     return new Promise((resolve) => {
         const img = new Image();
         img.onload = () => {
+            URL.revokeObjectURL(img.src);
             resolve({ width: img.width, height: img.height });
         };
         img.onerror = () => {
+            URL.revokeObjectURL(img.src);
             resolve({ width: 0, height: 0 });
         };
-        img.src = URL.createObjectURL(file);
+        img.src = URL.createObjectURL(fileOrBlob);
     });
 }
 
@@ -551,32 +626,179 @@ function initUploadSources() {
 
 async function handleFileUpload(files) {
     for (const file of Array.from(files)) {
-        if (!file.type.startsWith('image/')) continue;
+        // Проверяем формат
+        const ext = file.name.split('.').pop().toLowerCase();
+        const allowedFormats = ['jpg', 'jpeg', 'png', 'bmp', 'heic', 'heif', 'webp', 'tiff', 'tif'];
+        if (!allowedFormats.includes(ext) && !file.type.startsWith('image/')) continue;
 
-        const id = Date.now() + Math.random().toString(36).substr(2, 9);
-        const url = URL.createObjectURL(file);
+        try {
+            // Обрабатываем файл (конвертируем HEIC/TIFF если нужно)
+            const processedFile = await processImageFile(file);
+            
+            const id = Date.now() + Math.random().toString(36).substr(2, 9);
+            const url = URL.createObjectURL(processedFile.blob);
 
-        // Получаем размеры изображения
-        const dimensions = await getImageDimensions(file);
-        const aspectRatio = calculateAspectRatio(dimensions.width, dimensions.height);
-        const orientation = getOrientation(dimensions.width, dimensions.height);
+            // Получаем размеры изображения
+            const dimensions = await getImageDimensions(processedFile.blob);
+            const aspectRatio = calculateAspectRatio(dimensions.width, dimensions.height);
+            const orientation = getOrientation(dimensions.width, dimensions.height);
 
-        AppState.photos.push({
-            id,
-            file,
-            url,
-            name: file.name,
-            width: dimensions.width,
-            height: dimensions.height,
-            aspectRatio,
-            orientation,
-            settings: getDefaultSettings(orientation)
-        });
+            AppState.photos.push({
+                id,
+                file: processedFile.blob,          // Сконвертированный файл для отображения и загрузки
+                originalFile: file,                 // Оригинальный файл
+                url,
+                name: file.name,
+                width: dimensions.width,
+                height: dimensions.height,
+                aspectRatio,
+                orientation,
+                settings: getDefaultSettings(orientation)
+            });
+        } catch (e) {
+            console.error(`Error processing ${file.name}:`, e);
+        }
     }
 
     updatePhotosCount();
     renderUploadedPhotos();
     showUploadedPhotos();
+}
+
+// Обработка файла - конвертация HEIC/TIFF в отображаемый формат
+async function processImageFile(file) {
+    const ext = file.name.split('.').pop().toLowerCase();
+    
+    // HEIC/HEIF - конвертируем через heic2any
+    if (ext === 'heic' || ext === 'heif' || file.type === 'image/heic' || file.type === 'image/heif') {
+        if (typeof heic2any !== 'undefined') {
+            try {
+                const result = await heic2any({
+                    blob: file,
+                    toType: 'image/jpeg',
+                    quality: 0.92
+                });
+                const convertedBlob = Array.isArray(result) ? result[0] : result;
+                console.log('HEIC converted successfully');
+                return { blob: convertedBlob, converted: true };
+            } catch (e) {
+                console.warn('heic2any failed, trying canvas fallback:', e.message);
+            }
+        }
+        
+        // Fallback через canvas
+        try {
+            const canvasBlob = await convertViaCanvas(file);
+            if (canvasBlob) {
+                console.log('HEIC converted via canvas');
+                return { blob: canvasBlob, converted: true };
+            }
+        } catch (e) {
+            console.warn('Canvas fallback failed:', e.message);
+        }
+        
+        console.warn('HEIC: returning original file');
+        return { blob: file, converted: false };
+    }
+    
+    // TIFF - конвертируем через UTIF
+    if (ext === 'tiff' || ext === 'tif' || file.type === 'image/tiff') {
+        if (typeof UTIF !== 'undefined') {
+            try {
+                const convertedBlob = await convertTiffWithUTIF(file);
+                console.log('TIFF converted successfully');
+                return { blob: convertedBlob, converted: true };
+            } catch (e) {
+                console.warn('UTIF conversion failed:', e.message);
+            }
+        }
+        
+        try {
+            const canvasBlob = await convertViaCanvas(file);
+            if (canvasBlob) {
+                return { blob: canvasBlob, converted: true };
+            }
+        } catch (e) {
+            console.warn('Canvas fallback for TIFF failed');
+        }
+        
+        return { blob: file, converted: false };
+    }
+    
+    // Остальные форматы - возвращаем как есть
+    return { blob: file, converted: false };
+}
+
+// Конвертация через canvas (fallback)
+function convertViaCanvas(file) {
+    return new Promise((resolve) => {
+        const url = URL.createObjectURL(file);
+        const img = new Image();
+        
+        img.onload = () => {
+            try {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.naturalWidth || img.width;
+                canvas.height = img.naturalHeight || img.height;
+                
+                if (canvas.width === 0 || canvas.height === 0) {
+                    URL.revokeObjectURL(url);
+                    resolve(null);
+                    return;
+                }
+                
+                const ctx = canvas.getContext('2d');
+                ctx.fillStyle = '#FFFFFF';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                
+                canvas.toBlob((blob) => {
+                    URL.revokeObjectURL(url);
+                    resolve(blob);
+                }, 'image/jpeg', 0.92);
+            } catch (e) {
+                URL.revokeObjectURL(url);
+                resolve(null);
+            }
+        };
+        
+        img.onerror = () => {
+            URL.revokeObjectURL(url);
+            resolve(null);
+        };
+        
+        img.src = url;
+    });
+}
+
+// Конвертация TIFF через UTIF.js
+async function convertTiffWithUTIF(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                const ifds = UTIF.decode(e.target.result);
+                UTIF.decodeImage(e.target.result, ifds[0]);
+                const rgba = UTIF.toRGBA8(ifds[0]);
+                
+                const canvas = document.createElement('canvas');
+                canvas.width = ifds[0].width;
+                canvas.height = ifds[0].height;
+                const ctx = canvas.getContext('2d');
+                const imageData = ctx.createImageData(canvas.width, canvas.height);
+                imageData.data.set(rgba);
+                ctx.putImageData(imageData, 0, 0);
+                
+                canvas.toBlob((blob) => {
+                    resolve(blob);
+                }, 'image/jpeg', 0.92);
+            } catch (err) {
+                reject(err);
+            }
+        };
+        reader.onerror = reject;
+        reader.readAsArrayBuffer(file);
+    });
 }
 
 function getDefaultSettings(orientation) {

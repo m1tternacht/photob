@@ -473,14 +473,16 @@ def create_order_from_project(request, project_id):
 def process_order_photos(order, project):
     """
     Обрабатывает фото проекта и сохраняет в папку заказа.
-    - Применяет поворот, зум, кроп
-    - Ресайзит до точного размера печати в пикселях (300 DPI)
-    - Сохраняет как JPEG с именем: 001_10x15_x1.jpg
+    Для разных типов продуктов - разная обработка:
+    - prints: кроп + ресайз до размера печати
+    - polaroid: кроп + ресайз + добавление белой рамки
+    - canvas: кроп + ресайз до размера холста
     """
     from datetime import datetime
     
     photos_data = project.data.get('photos', [])
     now = datetime.now()
+    product_type = project.product_type.code
     
     # Определяем папку по типу продукта
     type_folders = {
@@ -490,7 +492,7 @@ def process_order_photos(order, project):
         'photobook': 'photobooks',
         'calendar': 'calendars',
     }
-    type_folder = type_folders.get(project.product_type.code, 'other')
+    type_folder = type_folders.get(product_type, 'other')
     
     # Базовая папка: orders/prints/2026/03/11/PB-2026-00001/
     base_path = os.path.join(
@@ -515,11 +517,10 @@ def process_order_photos(order, project):
         # Получаем путь к оригинальному файлу
         if '/media/' in photo_url:
             relative_path = photo_url.split('/media/')[-1]
-            # Декодируем URL-encoded символы (кириллица и т.д.)
             relative_path = unquote(relative_path)
             source_path = os.path.join(django_settings.MEDIA_ROOT, relative_path)
             
-            print(f"Processing photo {i+1}: {photo_url}")
+            print(f"Processing photo {i+1} ({product_type}): {photo_url}")
             print(f"  Source path: {source_path}")
             print(f"  Exists: {os.path.exists(source_path)}")
             
@@ -537,68 +538,14 @@ def process_order_photos(order, project):
                     elif rotation == 270:
                         img = img.transpose(Image.ROTATE_90)
                     
-                    # Получаем целевой размер в пикселях
-                    size_str = photo_settings.get('size', '10x15')
-                    target_w, target_h = get_print_size_pixels(size_str, dpi=300)
-                    target_ratio = target_w / target_h
-                    
-                    # Применяем кроп если есть
-                    crop = photo_settings.get('crop')
-                    img_w, img_h = img.size
-                    
-                    if crop:
-                        # Применяем зум (в JS это проценты: 100 = 1x)
-                        zoom = crop.get('zoom', 100) / 100.0
-                        if zoom != 1.0:
-                            new_w = int(img_w * zoom)
-                            new_h = int(img_h * zoom)
-                            img = img.resize((new_w, new_h), Image.LANCZOS)
-                            img_w, img_h = img.size
-                        
-                        # Координаты кропа (смещение от центра в пикселях)
-                        cx = crop.get('x', 0)
-                        cy = crop.get('y', 0)
+                    # Обрабатываем в зависимости от типа продукта
+                    if product_type == 'polaroid':
+                        img = process_polaroid_photo(img, photo_settings)
+                    elif product_type == 'canvas':
+                        img = process_canvas_photo(img, photo_settings)
                     else:
-                        cx, cy = 0, 0
-                    
-                    # Вычисляем область кропа на основе соотношения сторон печати
-                    img_ratio = img_w / img_h
-                    
-                    if img_ratio > target_ratio:
-                        # Изображение шире - обрезаем по бокам
-                        crop_h = img_h
-                        crop_w = int(crop_h * target_ratio)
-                    else:
-                        # Изображение выше - обрезаем сверху/снизу
-                        crop_w = img_w
-                        crop_h = int(crop_w / target_ratio)
-                    
-                    # Центр + смещение
-                    center_x = img_w // 2
-                    center_y = img_h // 2
-                    
-                    left = max(0, center_x - crop_w // 2 + int(cx))
-                    top = max(0, center_y - crop_h // 2 + int(cy))
-                    right = min(img_w, left + crop_w)
-                    bottom = min(img_h, top + crop_h)
-                    
-                    # Корректируем если вышли за границы
-                    if right - left < crop_w:
-                        if left == 0:
-                            right = min(img_w, crop_w)
-                        else:
-                            left = max(0, right - crop_w)
-                    if bottom - top < crop_h:
-                        if top == 0:
-                            bottom = min(img_h, crop_h)
-                        else:
-                            top = max(0, bottom - crop_h)
-                    
-                    if right > left and bottom > top:
-                        img = img.crop((left, top, right, bottom))
-                    
-                    # Ресайзим до точного размера печати
-                    img = img.resize((target_w, target_h), Image.LANCZOS)
+                        # prints и остальные
+                        img = process_print_photo(img, photo_settings)
                     
                     # Конвертируем в RGB
                     if img.mode in ('RGBA', 'LA', 'P'):
@@ -614,6 +561,7 @@ def process_order_photos(order, project):
                         img = img.convert('RGB')
                     
                     # Формируем имя файла: 001_10x15_x1.jpg
+                    size_str = photo_settings.get('size', '10x15')
                     size_clean = clean_size_string(size_str)
                     quantity = photo_settings.get('quantity', 1)
                     filename = f"{i+1:03d}_{size_clean}_x{quantity}.jpg"
@@ -623,11 +571,159 @@ def process_order_photos(order, project):
                     img.save(output_path, 'JPEG', quality=95, dpi=(300, 300))
                     
                     processed_files.append(filename)
+                    print(f"  Saved: {filename} ({img.size[0]}x{img.size[1]})")
                     
                 except Exception as e:
                     print(f"Error processing photo {i}: {e}")
+                    import traceback
+                    traceback.print_exc()
     
     return processed_files
+
+
+def process_print_photo(img, settings):
+    """Обработка фото для обычной печати"""
+    size_str = settings.get('size', '10x15')
+    target_w, target_h = get_print_size_pixels(size_str, dpi=300)
+    target_ratio = target_w / target_h
+    
+    img = apply_crop_and_zoom(img, settings, target_ratio)
+    
+    # Ресайзим до точного размера печати
+    img = img.resize((target_w, target_h), Image.LANCZOS)
+    
+    return img
+
+
+def process_polaroid_photo(img, settings):
+    """
+    Обработка фото для полароид-печати.
+    Создаёт белую рамку с фото внутри.
+    Паддинги: 5.5мм сверху/слева/справа, 20% высоты снизу
+    """
+    size_str = settings.get('size', '9x16')
+    
+    # Парсим размер (например "9x16" -> 9cm x 16cm)
+    size_str_clean = size_str.replace(',', '.').lower().replace('х', 'x')
+    parts = size_str_clean.split('x')
+    try:
+        outer_w_cm = float(parts[0])
+        outer_h_cm = float(parts[1])
+    except:
+        outer_w_cm, outer_h_cm = 9.0, 16.0
+    
+    # Конвертируем в мм
+    outer_w_mm = outer_w_cm * 10
+    outer_h_mm = outer_h_cm * 10
+    
+    # Паддинги полароид рамки
+    pad_top_mm = 5.5
+    pad_left_mm = 5.5
+    pad_right_mm = 5.5
+    pad_bottom_mm = outer_h_mm * 0.20  # 20% от высоты
+    
+    # Размер области фото в мм
+    photo_w_mm = outer_w_mm - pad_left_mm - pad_right_mm
+    photo_h_mm = outer_h_mm - pad_top_mm - pad_bottom_mm
+    
+    # Конвертируем в пиксели (300 DPI)
+    dpi = 300
+    outer_w_px = int(round(outer_w_mm / 25.4 * dpi))
+    outer_h_px = int(round(outer_h_mm / 25.4 * dpi))
+    photo_w_px = int(round(photo_w_mm / 25.4 * dpi))
+    photo_h_px = int(round(photo_h_mm / 25.4 * dpi))
+    pad_left_px = int(round(pad_left_mm / 25.4 * dpi))
+    pad_top_px = int(round(pad_top_mm / 25.4 * dpi))
+    
+    # Соотношение сторон области фото
+    photo_ratio = photo_w_px / photo_h_px
+    
+    # Применяем кроп и зум к фото
+    img = apply_crop_and_zoom(img, settings, photo_ratio)
+    
+    # Ресайзим фото до размера области
+    img = img.resize((photo_w_px, photo_h_px), Image.LANCZOS)
+    
+    # Создаём белую рамку
+    polaroid = Image.new('RGB', (outer_w_px, outer_h_px), (255, 255, 255))
+    
+    # Вставляем фото в рамку
+    polaroid.paste(img, (pad_left_px, pad_top_px))
+    
+    return polaroid
+
+
+def process_canvas_photo(img, settings):
+    """Обработка фото для холста"""
+    size_str = settings.get('size', '30x40')
+    target_w, target_h = get_print_size_pixels(size_str, dpi=300)
+    target_ratio = target_w / target_h
+    
+    img = apply_crop_and_zoom(img, settings, target_ratio)
+    
+    # Ресайзим до точного размера холста
+    img = img.resize((target_w, target_h), Image.LANCZOS)
+    
+    return img
+
+
+def apply_crop_and_zoom(img, settings, target_ratio):
+    """Применяет кроп и зум к изображению"""
+    crop = settings.get('crop')
+    img_w, img_h = img.size
+    
+    if crop:
+        # Применяем зум (в JS это проценты: 100 = 1x)
+        zoom = crop.get('zoom', 100) / 100.0
+        if zoom != 1.0:
+            new_w = int(img_w * zoom)
+            new_h = int(img_h * zoom)
+            img = img.resize((new_w, new_h), Image.LANCZOS)
+            img_w, img_h = img.size
+        
+        # Координаты кропа (смещение от центра в пикселях)
+        cx = crop.get('x', 0)
+        cy = crop.get('y', 0)
+    else:
+        cx, cy = 0, 0
+    
+    # Вычисляем область кропа на основе соотношения сторон
+    img_ratio = img_w / img_h
+    
+    if img_ratio > target_ratio:
+        # Изображение шире - обрезаем по бокам
+        crop_h = img_h
+        crop_w = int(crop_h * target_ratio)
+    else:
+        # Изображение выше - обрезаем сверху/снизу
+        crop_w = img_w
+        crop_h = int(crop_w / target_ratio)
+    
+    # Центр + смещение
+    center_x = img_w // 2
+    center_y = img_h // 2
+    
+    left = max(0, center_x - crop_w // 2 + int(cx))
+    top = max(0, center_y - crop_h // 2 + int(cy))
+    right = min(img_w, left + crop_w)
+    bottom = min(img_h, top + crop_h)
+    
+    # Корректируем если вышли за границы
+    if right - left < crop_w:
+        if left == 0:
+            right = min(img_w, crop_w)
+        else:
+            left = max(0, right - crop_w)
+    if bottom - top < crop_h:
+        if top == 0:
+            bottom = min(img_h, crop_h)
+        else:
+            top = max(0, bottom - crop_h)
+    
+    if right > left and bottom > top:
+        img = img.crop((left, top, right, bottom))
+    
+    return img
 
 
 @api_view(['GET'])
@@ -637,7 +733,6 @@ def download_order_photos(request, order_id):
     from datetime import datetime
     
     # Проверяем права (админ с session auth или владелец с JWT)
-    # Django admin использует session authentication
     if not request.user.is_authenticated:
         return Response({'detail': 'Authentication required'}, status=401)
     
@@ -654,6 +749,7 @@ def download_order_photos(request, order_id):
         
         project = item.project
         photos_data = project.data.get('photos', [])
+        product_type = project.product_type.code
         
         if not photos_data:
             continue
@@ -669,7 +765,7 @@ def download_order_photos(request, order_id):
                 'photobook': 'photobooks',
                 'calendar': 'calendars',
             }
-            type_folder = type_folders.get(project.product_type.code, 'other')
+            type_folder = type_folders.get(product_type, 'other')
             
             # Пробуем найти папку заказа
             order_date = order.created_at
@@ -713,48 +809,13 @@ def download_order_photos(request, order_id):
                                 elif rotation == 270:
                                     img = img.transpose(Image.ROTATE_90)
                                 
-                                # Получаем целевой размер
-                                size_str = photo_settings.get('size', '10x15')
-                                target_w, target_h = get_print_size_pixels(size_str, dpi=300)
-                                target_ratio = target_w / target_h
-                                
-                                # Применяем кроп
-                                img_w, img_h = img.size
-                                crop = photo_settings.get('crop')
-                                
-                                if crop:
-                                    zoom = crop.get('zoom', 100) / 100.0
-                                    if zoom != 1.0:
-                                        new_w = int(img_w * zoom)
-                                        new_h = int(img_h * zoom)
-                                        img = img.resize((new_w, new_h), Image.LANCZOS)
-                                        img_w, img_h = img.size
-                                    cx = crop.get('x', 0)
-                                    cy = crop.get('y', 0)
+                                # Обрабатываем в зависимости от типа продукта
+                                if product_type == 'polaroid':
+                                    img = process_polaroid_photo(img, photo_settings)
+                                elif product_type == 'canvas':
+                                    img = process_canvas_photo(img, photo_settings)
                                 else:
-                                    cx, cy = 0, 0
-                                
-                                # Вычисляем область кропа
-                                img_ratio = img_w / img_h
-                                if img_ratio > target_ratio:
-                                    crop_h = img_h
-                                    crop_w = int(crop_h * target_ratio)
-                                else:
-                                    crop_w = img_w
-                                    crop_h = int(crop_w / target_ratio)
-                                
-                                center_x = img_w // 2
-                                center_y = img_h // 2
-                                left = max(0, center_x - crop_w // 2 + int(cx))
-                                top = max(0, center_y - crop_h // 2 + int(cy))
-                                right = min(img_w, left + crop_w)
-                                bottom = min(img_h, top + crop_h)
-                                
-                                if right > left and bottom > top:
-                                    img = img.crop((left, top, right, bottom))
-                                
-                                # Ресайзим до точного размера
-                                img = img.resize((target_w, target_h), Image.LANCZOS)
+                                    img = process_print_photo(img, photo_settings)
                                 
                                 # Конвертируем в RGB
                                 if img.mode not in ('RGB',):
@@ -776,6 +837,7 @@ def download_order_photos(request, order_id):
                                 img_buffer.seek(0)
                                 
                                 # Имя файла: 001_10x15_x1.jpg
+                                size_str = photo_settings.get('size', '10x15')
                                 size_clean = clean_size_string(size_str)
                                 quantity = photo_settings.get('quantity', 1)
                                 filename = f"{i+1:03d}_{size_clean}_x{quantity}.jpg"
