@@ -6854,3 +6854,4 @@ backend/venv/Scripts/pip3.exe
 backend/venv/Scripts/python.exe
 backend/venv/Scripts/pythonw.exe
 backend/venv/Scripts/sqlformat.exe
+backend/media/
