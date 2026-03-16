@@ -14,14 +14,20 @@
     <div class="account-layout">
         <!-- Боковое меню -->
         <aside class="account-sidebar">
-            <nav class="account-nav">
+                        <nav class="account-nav">
                 <a href="index.html" class="account-nav-item">Обзор</a>
                 <a href="projects.html" class="account-nav-item active">
                     Проекты
                     <span class="nav-count" id="projects-count">0</span>
                 </a>
-                <a href="orders.html" class="account-nav-item">Заказы</a>
-                <a href="galleries.html" class="account-nav-item">Галереи</a>
+                <a href="orders.html" class="account-nav-item">
+                    Заказы
+                    <span class="nav-count" id="orders-count">0</span>
+                </a>
+                <a href="galleries.html" class="account-nav-item">
+                    Галереи
+                    <span class="nav-count" id="galleries-count">0</span>
+                </a>
                 <div class="account-nav-divider"></div>
                 <a href="settings.html" class="account-nav-item">Настройки</a>
                 <button class="account-logout" id="logout-btn">Выход</button>
@@ -57,6 +63,10 @@
                             Холсты
                             <span class="category-count" id="count-canvas">0</span>
                         </a>
+                        <a href="#" class="category-item" data-category="polaroid">
+                            Полароид
+                            <span class="category-count" id="count-polaroid">0</span>
+                        </a>
                         <a href="#" class="category-item" data-category="postcards">
                             Открытки
                             <span class="category-count" id="count-postcards">0</span>
@@ -70,47 +80,13 @@
 
                 <!-- Список проектов -->
                 <div class="projects-content">
-                    <!-- Фильтры -->
+                    <!-- Сортировка -->
                     <div class="filters-bar">
-                        <div class="filter-group">
-                            <label>Продукт</label>
-                            <select class="filter-select" id="filter-product">
-                                <option value="all">Все</option>
-                                <option value="photobook">Фотокнига</option>
-                                <option value="prints">Фотопечать</option>
-                                <option value="calendar">Календарь</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Размер</label>
-                            <select class="filter-select" id="filter-size">
-                                <option value="all">Все</option>
-                                <option value="10x10">10x10</option>
-                                <option value="20x20">20x20</option>
-                                <option value="30x30">30x30</option>
-                            </select>
-                        </div>
-                        <div class="filter-group">
-                            <label>Статус</label>
-                            <select class="filter-select" id="filter-status">
-                                <option value="all">Все</option>
-                                <option value="draft">Черновик</option>
-                                <option value="ready">Готов к заказу</option>
-                            </select>
-                        </div>
-                        <div class="filter-search">
-                            <input type="text" placeholder="Поиск" id="filter-search">
-                            <button type="button">🔍</button>
-                        </div>
-                        
-                        <div class="filters-right">
-                            <select class="sort-select" id="sort-by">
-                                <option value="date-desc">Дата изменения ↓</option>
-                                <option value="date-asc">Дата изменения ↑</option>
-                                <option value="name">По названию</option>
-                            </select>
-                            <button class="btn-create" id="create-project-btn">Создать проект</button>
-                        </div>
+                        <select class="sort-select" id="sort-by">
+                            <option value="date-desc">Дата изменения ↓</option>
+                            <option value="date-asc">Дата изменения ↑</option>
+                            <option value="name">По названию</option>
+                        </select>
                     </div>
 
                     <!-- Список проектов -->

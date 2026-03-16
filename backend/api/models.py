@@ -30,6 +30,22 @@ def transliterate(text):
     return result[:50] or 'project'  # Ограничиваем длину
 
 
+def gallery_photo_upload_path(instance, filename):
+    """
+    Путь для фото галереи:
+    galleries/{username}/{gallery_folder_name}/{filename}
+    """
+    name, ext = os.path.splitext(filename)
+    safe_name = transliterate(name)
+    safe_name = re.sub(r'[^\w\-]', '_', safe_name)
+    safe_name = re.sub(r'_+', '_', safe_name).strip('_')
+    safe_filename = f"{safe_name}{ext.lower()}" if safe_name else f"photo{ext.lower()}"
+
+    username = instance.gallery.user.username
+    folder_name = instance.gallery.folder_name
+    return os.path.join('galleries', username, folder_name, safe_filename)
+
+
 def photo_upload_path(instance, filename):
     """
     Генерирует путь для загрузки фото:
@@ -194,6 +210,67 @@ class Photo(models.Model):
     def __str__(self):
         return self.original_name
     
+    @property
+    def orientation(self):
+        if self.width > self.height:
+            return 'landscape'
+        elif self.height > self.width:
+            return 'portrait'
+        return 'square'
+
+
+# ==================== GALLERIES ====================
+
+class Gallery(models.Model):
+    """Галереи пользователей"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='galleries')
+    name = models.CharField(max_length=255)
+    folder_name = models.CharField(max_length=100)  # безопасное имя папки (транслит)
+    cover_photo = models.ForeignKey(
+        'GalleryPhoto', on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='+'
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        unique_together = ['user', 'folder_name']
+
+    def __str__(self):
+        return f"{self.user.username}/{self.name}"
+
+    def get_photos_count(self):
+        return self.gallery_photos.count()
+
+    def save(self, *args, **kwargs):
+        if not self.folder_name:
+            base = transliterate(self.name) or 'gallery'
+            folder = base
+            counter = 1
+            while Gallery.objects.filter(user=self.user, folder_name=folder).exclude(pk=self.pk).exists():
+                folder = f"{base}_{counter}"
+                counter += 1
+            self.folder_name = folder
+        super().save(*args, **kwargs)
+
+
+class GalleryPhoto(models.Model):
+    """Фото в галерее"""
+    gallery = models.ForeignKey(Gallery, on_delete=models.CASCADE, related_name='gallery_photos')
+    file = models.ImageField(upload_to=gallery_photo_upload_path)
+    original_name = models.CharField(max_length=255)
+    width = models.IntegerField(default=0)
+    height = models.IntegerField(default=0)
+    file_size = models.IntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+
+    def __str__(self):
+        return f"{self.gallery.name}/{self.original_name}"
+
     @property
     def orientation(self):
         if self.width > self.height:

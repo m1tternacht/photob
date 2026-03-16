@@ -12,7 +12,6 @@
     <div id="header-container"></div>
 
     <div class="account-layout">
-        <!-- Боковое меню -->
         <aside class="account-sidebar">
             <nav class="account-nav">
                 <a href="index.html" class="account-nav-item active">Обзор</a>
@@ -20,72 +19,56 @@
                     Проекты
                     <span class="nav-count" id="projects-count">0</span>
                 </a>
-                <a href="orders.html" class="account-nav-item">Заказы</a>
-                <a href="galleries.html" class="account-nav-item">Галереи</a>
+                <a href="orders.html" class="account-nav-item">
+                    Заказы
+                    <span class="nav-count" id="orders-count">0</span>
+                </a>
+                <a href="galleries.html" class="account-nav-item">
+                    Галереи
+                    <span class="nav-count" id="galleries-count">0</span>
+                </a>
                 <div class="account-nav-divider"></div>
                 <a href="settings.html" class="account-nav-item">Настройки</a>
                 <button class="account-logout" id="logout-btn">Выход</button>
             </nav>
         </aside>
 
-        <!-- Основной контент -->
-        <main class="account-main">
+        <main class="account-main" id="dashboard-root">
             <h1 class="account-page-title">Обзор</h1>
 
             <!-- Галереи -->
             <section class="account-section">
-                <div class="section-header">
+                <div class="dash-section-header">
                     <h2 class="section-title">Галереи</h2>
-                    <a href="galleries.html" class="section-action">создать новую</a>
-                    <div class="section-meta">
-                        <span id="galleries-count-text">0 из 0</span>
-                        <a href="galleries.html" class="section-link">все</a>
-                    </div>
+                    <span id="dash-galleries-total" style="font-size:13px;color:#999;"></span>
+                    <a href="galleries.html" class="dash-section-link">все галереи →</a>
                 </div>
-                
-                <div class="galleries-grid" id="galleries-preview">
-                    <!-- Галереи будут добавлены через JS -->
-                    <div class="empty-state" id="galleries-empty">
-                        <p>У вас пока нет галерей</p>
-                        <a href="galleries.html" class="btn-outline">Создать галерею</a>
-                    </div>
+                <div class="galleries-grid" id="dash-galleries-grid">
+                    <p class="dash-empty">Загрузка...</p>
                 </div>
             </section>
 
             <!-- Проекты -->
             <section class="account-section">
-                <div class="section-header">
+                <div class="dash-section-header">
                     <h2 class="section-title">Проекты</h2>
-                    <a href="projects.html" class="section-action">создать новый</a>
-                    <div class="section-meta">
-                        <span id="projects-count-text">0 из 0</span>
-                        <a href="projects.html" class="section-link">все</a>
-                    </div>
+                    <span id="dash-projects-total" style="font-size:13px;color:#999;"></span>
+                    <a href="projects.html" class="dash-section-link">все проекты →</a>
                 </div>
-                
-                <div class="projects-grid" id="projects-preview">
-                    <!-- Проекты будут добавлены через JS -->
-                    <div class="empty-state" id="projects-empty">
-                        <p>У вас пока нет проектов</p>
-                        <a href="../index.html" class="btn-outline">Перейти к покупкам</a>
-                    </div>
+                <div class="galleries-grid" id="dash-projects-grid">
+                    <p class="dash-empty">Загрузка...</p>
                 </div>
             </section>
 
             <!-- Заказы -->
             <section class="account-section">
-                <div class="section-header">
+                <div class="dash-section-header">
                     <h2 class="section-title">Заказы</h2>
-                    <div class="section-meta">
-                        <span>пока нет заказов</span>
-                    </div>
+                    <span id="dash-orders-total" style="font-size:13px;color:#999;"></span>
+                    <a href="orders.html" class="dash-section-link">все заказы →</a>
                 </div>
-                
-                <div class="orders-list" id="orders-preview">
-                    <div class="empty-state" id="orders-empty">
-                        <p>У вас пока нет заказов</p>
-                        <a href="../index.html" class="btn-outline">Перейти к покупкам</a>
-                    </div>
+                <div class="galleries-grid" id="dash-orders-grid">
+                    <p class="dash-empty">Загрузка...</p>
                 </div>
             </section>
         </main>

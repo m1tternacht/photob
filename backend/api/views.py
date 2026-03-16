@@ -19,7 +19,8 @@ import re
 
 from .models import (
     Product, ProductType, PrintSize, PaperType,
-    Project, Photo, Order, OrderItem
+    Project, Photo, Order, OrderItem,
+    Gallery, GalleryPhoto
 )
 from .serializers import (
     ProductSerializer, ProductTypeSerializer, ProductTypeListSerializer,
@@ -27,7 +28,8 @@ from .serializers import (
     ProjectListSerializer, ProjectDetailSerializer, 
     ProjectCreateSerializer, ProjectUpdateSerializer,
     PhotoSerializer,
-    OrderListSerializer, OrderDetailSerializer, OrderItemSerializer
+    OrderListSerializer, OrderDetailSerializer, OrderItemSerializer,
+    GalleryListSerializer, GalleryDetailSerializer, GalleryPhotoSerializer
 )
 
 # Попытка импорта pillow-heif для HEIC
@@ -887,3 +889,147 @@ def merge_cart(request):
     ).update(user=request.user, session_key=None)
 
     return Response({'detail': 'Data merged'})
+
+
+# ==================== GALLERIES ====================
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def gallery_list(request):
+    """Список галерей / Создание галереи"""
+    if request.method == 'GET':
+        galleries = Gallery.objects.filter(user=request.user)
+        serializer = GalleryListSerializer(galleries, many=True, context={'request': request})
+        return Response(serializer.data)
+
+    elif request.method == 'POST':
+        name = request.data.get('name', '').strip()
+        if not name:
+            return Response({'detail': 'Gallery name is required'}, status=400)
+
+        gallery = Gallery(user=request.user, name=name)
+        gallery.save()
+
+        serializer = GalleryDetailSerializer(gallery, context={'request': request})
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+@api_view(['GET', 'PUT', 'DELETE'])
+@permission_classes([IsAuthenticated])
+def gallery_detail(request, gallery_id):
+    """Детали / Переименование / Удаление галереи"""
+    gallery = get_object_or_404(Gallery, id=gallery_id, user=request.user)
+
+    if request.method == 'GET':
+        serializer = GalleryDetailSerializer(gallery, context={'request': request})
+        return Response(serializer.data)
+
+    elif request.method == 'PUT':
+        name = request.data.get('name', '').strip()
+        if not name:
+            return Response({'detail': 'Gallery name is required'}, status=400)
+        gallery.name = name
+        gallery.save()
+        serializer = GalleryDetailSerializer(gallery, context={'request': request})
+        return Response(serializer.data)
+
+    elif request.method == 'DELETE':
+        # Удаляем файлы галереи с диска
+        import shutil
+        from django.conf import settings as django_settings
+        gallery_dir = os.path.join(
+            django_settings.MEDIA_ROOT, 'galleries',
+            request.user.username, gallery.folder_name
+        )
+        if os.path.exists(gallery_dir):
+            shutil.rmtree(gallery_dir)
+        gallery.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser])
+def gallery_upload_photos(request, gallery_id):
+    """Загрузка фото в галерею"""
+    gallery = get_object_or_404(Gallery, id=gallery_id, user=request.user)
+
+    files = request.FILES.getlist('files')
+    if not files:
+        # Пробуем single file
+        single = request.FILES.get('file')
+        if single:
+            files = [single]
+
+    if not files:
+        return Response({'detail': 'No files provided'}, status=400)
+
+    uploaded = []
+    errors = []
+
+    for file in files:
+        original_name = file.name
+        ext = os.path.splitext(original_name)[1].lower()
+
+        try:
+            img = Image.open(file)
+            width, height = img.size
+
+            # Конвертируем в RGB если нужно
+            needs_conversion = ext in ['.heic', '.heif', '.tiff', '.tif', '.png', '.bmp', '.webp']
+            if needs_conversion or img.mode not in ('RGB', 'L'):
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    if img.mode in ('RGBA', 'LA'):
+                        background.paste(img, mask=img.split()[-1])
+                    else:
+                        background.paste(img)
+                    img = background
+                elif img.mode != 'RGB':
+                    img = img.convert('RGB')
+
+                output = io.BytesIO()
+                img.save(output, format='JPEG', quality=95, dpi=(300, 300))
+                output.seek(0)
+
+                from django.core.files.uploadedfile import InMemoryUploadedFile
+                new_name = os.path.splitext(original_name)[0] + '.jpg'
+                file = InMemoryUploadedFile(
+                    output, 'file', new_name, 'image/jpeg', output.getbuffer().nbytes, None
+                )
+                original_name = new_name
+            else:
+                file.seek(0)
+
+            gallery_photo = GalleryPhoto.objects.create(
+                gallery=gallery,
+                file=file,
+                original_name=original_name,
+                width=width,
+                height=height,
+                file_size=file.size if hasattr(file, 'size') else 0,
+            )
+            uploaded.append(GalleryPhotoSerializer(gallery_photo, context={'request': request}).data)
+
+        except Exception as e:
+            errors.append({'file': original_name, 'error': str(e)})
+
+    return Response({
+        'uploaded': uploaded,
+        'errors': errors
+    }, status=status.HTTP_201_CREATED if uploaded else status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def gallery_photo_delete(request, gallery_id, photo_id):
+    """Удаление фото из галереи"""
+    gallery = get_object_or_404(Gallery, id=gallery_id, user=request.user)
+    photo = get_object_or_404(GalleryPhoto, id=photo_id, gallery=gallery)
+
+    if photo.file:
+        photo.file.delete(save=False)
+    photo.delete()
+    return Response(status=status.HTTP_204_NO_CONTENT)

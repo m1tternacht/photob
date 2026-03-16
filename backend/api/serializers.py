@@ -1,7 +1,8 @@
 from rest_framework import serializers
 from .models import (
     Product, ProductType, PrintSize, PaperType,
-    Project, Photo, Order, OrderItem
+    Project, Photo, Order, OrderItem,
+    Gallery, GalleryPhoto
 )
 
 
@@ -172,3 +173,53 @@ class OrderDetailSerializer(serializers.ModelSerializer):
             'customer_name', 'customer_email', 'customer_phone',
             'items', 'created_at', 'updated_at', 'paid_at'
         ]
+
+
+# ==================== GALLERY SERIALIZERS ====================
+
+class GalleryPhotoSerializer(serializers.ModelSerializer):
+    url = serializers.SerializerMethodField()
+    orientation = serializers.ReadOnlyField()
+
+    class Meta:
+        model = GalleryPhoto
+        fields = ['id', 'url', 'original_name', 'width', 'height', 'file_size', 'orientation', 'created_at']
+
+    def get_url(self, obj):
+        request = self.context.get('request')
+        if obj.file and request:
+            return request.build_absolute_uri(obj.file.url)
+        return None
+
+
+class GalleryListSerializer(serializers.ModelSerializer):
+    photos_count = serializers.SerializerMethodField()
+    preview_photos = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Gallery
+        fields = ['id', 'name', 'folder_name', 'photos_count', 'preview_photos', 'created_at', 'updated_at']
+
+    def get_photos_count(self, obj):
+        return obj.gallery_photos.count()
+
+    def get_preview_photos(self, obj):
+        # Первые 4 фото для превью
+        photos = obj.gallery_photos.all()[:4]
+        request = self.context.get('request')
+        return [
+            request.build_absolute_uri(p.file.url) if request and p.file else None
+            for p in photos
+        ]
+
+
+class GalleryDetailSerializer(serializers.ModelSerializer):
+    photos = GalleryPhotoSerializer(source='gallery_photos', many=True, read_only=True)
+    photos_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Gallery
+        fields = ['id', 'name', 'folder_name', 'photos_count', 'photos', 'created_at', 'updated_at']
+
+    def get_photos_count(self, obj):
+        return obj.gallery_photos.count()

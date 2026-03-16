@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Мои фото - Photobond</title>
+    <title>Мои галереи - Photobond</title>
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="account.css">
 </head>
@@ -12,118 +12,155 @@
     <div id="header-container"></div>
 
     <div class="account-layout">
-        <!-- Боковое меню -->
         <aside class="account-sidebar">
-            <nav class="account-nav">
+                        <nav class="account-nav">
                 <a href="index.html" class="account-nav-item">Обзор</a>
                 <a href="projects.html" class="account-nav-item">
                     Проекты
                     <span class="nav-count" id="projects-count">0</span>
                 </a>
-                <a href="orders.html" class="account-nav-item">Заказы</a>
-                <a href="galleries.html" class="account-nav-item active">Галереи</a>
+                <a href="orders.html" class="account-nav-item">
+                    Заказы
+                    <span class="nav-count" id="orders-count">0</span>
+                </a>
+                <a href="galleries.html" class="account-nav-item active">
+                    Галереи
+                    <span class="nav-count" id="galleries-count">0</span>
+                </a>
                 <div class="account-nav-divider"></div>
                 <a href="settings.html" class="account-nav-item">Настройки</a>
                 <button class="account-logout" id="logout-btn">Выход</button>
             </nav>
         </aside>
 
-        <!-- Основной контент -->
         <main class="account-main">
-            <h1 class="account-page-title">Мои фото</h1>
 
-            <!-- Заголовок с фильтрами -->
-            <div class="section-header">
-                <h2 class="section-title">Галереи</h2>
-                <div class="section-meta">
-                    <span>Сортировка:</span>
-                    <select class="sort-select" id="sort-galleries">
-                        <option value="date-desc">Новые → Старые</option>
-                        <option value="date-asc">Старые → Новые</option>
-                        <option value="name">По названию</option>
-                    </select>
-                    <div class="filter-search">
-                        <input type="text" placeholder="Поиск" id="search-galleries">
-                        <button type="button">🔍</button>
+            <!-- ===== СПИСОК ГАЛЕРЕЙ ===== -->
+            <div id="view-galleries">
+                <h1 class="account-page-title">Мои галереи</h1>
+
+                <div class="section-header">
+                    <h2 class="section-title">Галереи</h2>
+                    <div class="section-meta">
+                        <span>Сортировка:</span>
+                        <select class="sort-select" id="sort-galleries">
+                            <option value="date-desc">Новые → Старые</option>
+                            <option value="date-asc">Старые → Новые</option>
+                            <option value="name">По названию</option>
+                        </select>
                     </div>
+                </div>
+
+                <div class="galleries-grid" id="galleries-grid">
+                    <!-- FIX 2: карточка «создать» (название не нужно) -->
+                    <div class="gallery-card gallery-card-new" id="create-gallery-card">
+                        <div class="gallery-preview">
+                            <span class="plus-icon">+</span>
+                            <span>Создать галерею</span>
+                        </div>
+                    </div>
+                    <!-- карточки галерей рендерятся в JS -->
+                </div>
+
+                <div class="galleries-loading" id="galleries-loading" style="display:none;">
+                    <p style="color:#999;padding:20px 0;">Загрузка...</p>
+                </div>
+
+                <div class="empty-state" id="galleries-empty" style="display:none;">
+                    <p>У вас пока нет галерей</p>
+                    <p style="font-size:12px;color:#999;">Создайте галерею, чтобы загружать и организовывать фотографии</p>
+                    <button class="btn-outline" id="create-first-gallery">Создать галерею</button>
                 </div>
             </div>
 
-            <!-- Сетка галерей -->
-            <div class="galleries-grid" id="galleries-grid">
-                <!-- Карточка создания новой галереи -->
-                <div class="gallery-card gallery-card-new" id="create-gallery-card">
-                    <div class="gallery-preview">
-                        <span class="plus-icon">+</span>
-                        <span>Создать галерею</span>
+            <!-- ===== ПРОСМОТР ГАЛЕРЕИ ===== -->
+            <div id="view-gallery-detail" style="display:none;">
+                <div class="gallery-detail-header">
+                    <!-- FIX 4: без скругления -->
+                    <button class="btn-back" id="back-to-galleries">← Назад</button>
+                    <h1 class="account-page-title" id="gallery-detail-title">Галерея</h1>
+                    <div class="gallery-detail-actions">
+                        <!-- FIX 4: зелёная кнопка -->
+                        <button class="btn-add-photos btn-sm" id="btn-add-photos-detail">+ Добавить фото</button>
+                        <!-- FIX 4: без скругления -->
+                        <button class="btn-danger btn-sm" id="btn-delete-gallery">Удалить галерею</button>
                     </div>
                 </div>
 
-                <!-- Пример галереи 1 -->
-                <div class="gallery-card" data-gallery-id="1">
-                    <div class="gallery-preview">
-                        <div class="gallery-photo-count"><span>2</span> Photos</div>
-                        <img src="../images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="">
-                        <img src="../images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="">
-                        <div class="gallery-preview-placeholder"></div>
-                        <div class="gallery-preview-placeholder"></div>
+                <div class="gallery-detail-meta" id="gallery-detail-meta"></div>
+
+                <div id="gallery-upload-progress-detail" style="display:none;" class="upload-progress-bar-wrap">
+                    <div class="upload-progress-label">Загрузка фото...</div>
+                    <div class="upload-progress-bar">
+                        <div class="upload-progress-fill" id="upload-fill-detail"></div>
                     </div>
-                    <div class="gallery-info">
-                        <div class="gallery-name">Отпуск 2025</div>
-                        <div class="gallery-date">1</div>
-                    </div>
+                    <div class="upload-progress-count" id="upload-count-detail">0 / 0</div>
                 </div>
 
-                <!-- Пример галереи 2 -->
-                <div class="gallery-card" data-gallery-id="2">
-                    <div class="gallery-preview">
-                        <div class="gallery-photo-count"><span>28</span> Photos</div>
-                        <img src="../images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="">
-                        <img src="../images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="">
-                        <img src="../images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="">
-                        <img src="../images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="">
-                    </div>
-                    <div class="gallery-info">
-                        <div class="gallery-name">Семейные фото</div>
-                        <div class="gallery-date">1</div>
-                    </div>
+                <!-- FIX 3: сетка фото с названиями (рендерится в JS) -->
+                <div class="gallery-photos-grid" id="gallery-photos-grid"></div>
+
+                <div class="empty-state" id="gallery-photos-empty" style="display:none;">
+                    <p>В этой галерее пока нет фото</p>
+                    <button class="btn-outline" id="btn-add-first-photo">Добавить фото</button>
                 </div>
+
+                <input type="file" id="add-photos-input" multiple accept="image/*" hidden>
             </div>
 
-            <!-- Пустое состояние -->
-            <div class="empty-state" id="galleries-empty" style="display: none;">
-                <p>У вас пока нет галерей</p>
-                <p style="font-size: 12px; color: #999;">Создайте галерею, чтобы загружать и организовывать фотографии</p>
-                <button class="btn-outline" id="create-first-gallery">Создать галерею</button>
-            </div>
         </main>
     </div>
 
-    <!-- Модальное окно создания галереи -->
+    <!-- ===== МОДАЛЬНОЕ ОКНО СОЗДАНИЯ ===== -->
     <div class="modal" id="create-gallery-modal">
         <div class="modal-content">
             <button class="modal-close" id="modal-close">&times;</button>
             <h2 class="modal-title">Создать галерею</h2>
-            <form id="create-gallery-form" class="modal-form">
+            <div class="modal-form">
                 <div class="form-group">
                     <label for="gallery-name">Название галереи</label>
-                    <input type="text" id="gallery-name" placeholder="Например: Отпуск 2026" required>
+                    <input type="text" id="gallery-name" placeholder="Например: Отпуск 2026" autocomplete="off">
                 </div>
                 <div class="form-group">
-                    <label>Загрузить фотографии</label>
-                    <div class="upload-area" id="upload-area">
+                    <label>Загрузить фотографии <span style="color:#999;font-size:11px;">(необязательно)</span></label>
+                    <input type="file" id="gallery-files" multiple accept="image/*" hidden>
+                    <label class="upload-area" id="upload-area" for="gallery-files">
                         <span class="upload-icon">📁</span>
                         <p>Перетащите файлы сюда</p>
                         <p class="upload-hint">или нажмите для выбора</p>
-                        <input type="file" id="gallery-files" multiple accept="image/*" hidden>
-                    </div>
+                    </label>
                     <div class="upload-preview" id="upload-preview"></div>
                 </div>
+
+                <div id="gallery-upload-progress" style="display:none;" class="upload-progress-bar-wrap">
+                    <div class="upload-progress-label">Загрузка фото...</div>
+                    <div class="upload-progress-bar">
+                        <div class="upload-progress-fill" id="upload-fill"></div>
+                    </div>
+                    <div class="upload-progress-count" id="upload-count">0 / 0</div>
+                </div>
+
                 <div class="modal-actions">
                     <button type="button" class="btn-outline" id="cancel-create">Отмена</button>
-                    <button type="submit" class="btn-create">Создать</button>
+                    <button type="button" class="btn-create" id="btn-create-gallery">Создать</button>
                 </div>
-            </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- ===== ЛАЙТБОКС ===== -->
+    <div class="lightbox" id="lightbox" style="display:none;">
+        <button class="lightbox-close" id="lightbox-close">&times;</button>
+        <!-- FIX 3: название фото сверху -->
+        <div class="lightbox-title" id="lightbox-title"></div>
+        <button class="lightbox-nav lightbox-prev" id="lightbox-prev">&#8249;</button>
+        <div class="lightbox-img-wrap">
+            <img id="lightbox-img" src="" alt="">
+        </div>
+        <button class="lightbox-nav lightbox-next" id="lightbox-next">&#8250;</button>
+        <div class="lightbox-info">
+            <span id="lightbox-counter"></span>
+            <button class="btn-danger btn-sm" id="lightbox-delete">Удалить фото</button>
         </div>
     </div>
 
@@ -131,5 +168,6 @@
 
     <script src="../script.js"></script>
     <script src="account.js"></script>
+    <script src="galleries.js"></script>
 </body>
 </html>

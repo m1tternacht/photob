@@ -1,7 +1,8 @@
 from django.contrib import admin
 from .models import (
     ProductType, PrintSize, PaperType,
-    Project, Photo, Order, OrderItem, Product
+    Project, Photo, Order, OrderItem, Product,
+    Gallery, GalleryPhoto
 )
 
 
@@ -183,3 +184,29 @@ class OrderItemAdmin(admin.ModelAdmin):
 class ProductAdmin(admin.ModelAdmin):
     list_display = ['title', 'slug', 'base_price', 'is_active']
     list_editable = ['is_active', 'base_price']
+
+
+# ==================== GALLERY ====================
+
+class GalleryPhotoInline(admin.TabularInline):
+    model = GalleryPhoto
+    extra = 0
+    readonly_fields = ['original_name', 'width', 'height', 'file_size', 'created_at']
+    fields = ['original_name', 'width', 'height', 'file_size', 'created_at']
+
+
+@admin.register(Gallery)
+class GalleryAdmin(admin.ModelAdmin):
+    list_display = ['name', 'folder_name', 'user', 'get_photos_count', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['name', 'user__username']
+    readonly_fields = ['folder_name', 'created_at', 'updated_at']
+    inlines = [GalleryPhotoInline]
+
+
+@admin.register(GalleryPhoto)
+class GalleryPhotoAdmin(admin.ModelAdmin):
+    list_display = ['original_name', 'gallery', 'width', 'height', 'created_at']
+    list_filter = ['created_at']
+    search_fields = ['original_name', 'gallery__name']
+    readonly_fields = ['width', 'height', 'file_size', 'created_at']

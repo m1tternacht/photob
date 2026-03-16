@@ -14,14 +14,20 @@
     <div class="account-layout">
         <!-- Боковое меню -->
         <aside class="account-sidebar">
-            <nav class="account-nav">
+                        <nav class="account-nav">
                 <a href="index.html" class="account-nav-item">Обзор</a>
                 <a href="projects.html" class="account-nav-item">
                     Проекты
                     <span class="nav-count" id="projects-count">0</span>
                 </a>
-                <a href="orders.html" class="account-nav-item active">Заказы</a>
-                <a href="galleries.html" class="account-nav-item">Галереи</a>
+                <a href="orders.html" class="account-nav-item active">
+                    Заказы
+                    <span class="nav-count" id="orders-count">0</span>
+                </a>
+                <a href="galleries.html" class="account-nav-item">
+                    Галереи
+                    <span class="nav-count" id="galleries-count">0</span>
+                </a>
                 <div class="account-nav-divider"></div>
                 <a href="settings.html" class="account-nav-item">Настройки</a>
                 <button class="account-logout" id="logout-btn">Выход</button>
@@ -43,10 +49,6 @@
                         <option value="accepted">Принят в работу</option>
                         <option value="ready">Готов</option>
                     </select>
-                </div>
-                <div class="filter-search">
-                    <input type="text" placeholder="Номер заказа" id="filter-search">
-                    <button type="button">🔍</button>
                 </div>
             </div>
 

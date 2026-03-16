@@ -31,6 +31,12 @@ urlpatterns = [
     path('orders/<int:order_id>/', views.order_detail),
     path('orders/<int:order_id>/download/', views.download_order_photos),
     
+    # Galleries
+    path('galleries/', views.gallery_list),
+    path('galleries/<int:gallery_id>/', views.gallery_detail),
+    path('galleries/<int:gallery_id>/photos/', views.gallery_upload_photos),
+    path('galleries/<int:gallery_id>/photos/<int:photo_id>/', views.gallery_photo_delete),
+    
     # Legacy
     path('products/', views.product_list),
 ]
