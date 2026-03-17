@@ -1,0 +1,507 @@
+/* ==================== LANDING PAGE STYLES ==================== */
+/* landing.css — подключается только к index.html */
+
+/* ─── Общие секции ─── */
+.section-container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 clamp(20px, 4vw, 60px);
+}
+
+.section-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(26px, 3.5vw, 46px);
+    font-weight: 500;
+    color: var(--text-dark);
+    margin-bottom: 12px;
+    letter-spacing: -0.02em;
+}
+
+.section-subtitle {
+    font-size: 16px;
+    color: var(--text-muted);
+    margin-bottom: 50px;
+}
+
+/* ─── Акционный баннер ─── */
+.promo-banner {
+    background: var(--text-dark);
+    color: #fff;
+    text-align: center;
+    padding: 10px 20px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.promo-tag {
+    background: var(--primary);
+    color: #fff;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 2px 8px;
+    font-weight: 600;
+}
+
+.promo-link {
+    color: #fff;
+    text-decoration: underline;
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.promo-link:hover { color: #aef0ee; }
+
+/* ─── Hero v2 ─── */
+.hero-v2 {
+    position: relative;
+    height: clamp(480px, 75vh, 820px);
+    display: flex;
+    align-items: flex-end;
+    overflow: hidden;
+}
+
+.hero-v2-bg {
+    position: absolute;
+    inset: 0;
+}
+
+.hero-v2-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 40%;
+}
+
+.hero-v2-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+        to top,
+        rgba(0,0,0,0.85) 0%,
+        rgba(0,0,0,0.4) 50%,
+        rgba(0,0,0,0.15) 100%
+    );
+}
+
+.hero-v2-content {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: clamp(30px, 5vw, 70px) clamp(20px, 4vw, 60px);
+    color: #fff;
+}
+
+.hero-v2-eyebrow {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    color: rgba(255,255,255,0.65);
+    margin-bottom: 16px;
+    font-weight: 400;
+}
+
+.hero-v2-title {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(36px, 6vw, 80px);
+    font-weight: 500;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    margin-bottom: 18px;
+    max-width: 640px;
+}
+
+.hero-v2-sub {
+    font-size: clamp(15px, 1.8vw, 18px);
+    color: rgba(255,255,255,0.8);
+    margin-bottom: 32px;
+    max-width: 480px;
+    line-height: 1.5;
+}
+
+.hero-v2-actions {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    margin-bottom: 50px;
+    flex-wrap: wrap;
+}
+
+.hero-btn-primary {
+    background: var(--primary);
+    border: 2px solid var(--primary);
+    color: #fff !important;
+    letter-spacing: 0.3px;
+    padding: 14px 32px;
+    font-size: 15px;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.hero-btn-primary:hover {
+    background: var(--primary-hover) !important;
+    border-color: var(--primary-hover);
+}
+
+.btn-outline-white {
+    border: 1px solid rgba(255,255,255,0.55);
+    color: #fff;
+    text-decoration: none;
+    padding: 13px 28px;
+    font-size: 14px;
+    letter-spacing: 0.3px;
+    transition: background 0.2s, border-color 0.2s;
+}
+
+.btn-outline-white:hover {
+    background: rgba(255,255,255,0.12);
+    border-color: rgba(255,255,255,0.8);
+}
+
+.hero-v2-stats {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    padding-top: 30px;
+    border-top: 1px solid rgba(255,255,255,0.2);
+    max-width: 500px;
+}
+
+.hero-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding: 0 28px 0 0;
+}
+
+.hero-stat:first-child { padding-left: 0; }
+
+.hero-stat-num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 24px;
+    font-weight: 600;
+    color: #fff;
+    line-height: 1;
+}
+
+.hero-stat-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.55);
+    letter-spacing: 0.3px;
+}
+
+.hero-stat-divider {
+    width: 1px;
+    height: 32px;
+    background: rgba(255,255,255,0.2);
+    margin: 0 28px 0 0;
+    flex-shrink: 0;
+}
+
+/* ─── Услуги ─── */
+.services-section {
+    padding: clamp(50px, 7vw, 100px) 0;
+    background: #fff;
+}
+
+.services-section .section-title {
+    margin-bottom: 40px;
+}
+
+.services-grid {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-rows: auto auto;
+    gap: 16px;
+}
+
+/* Первая карточка — большая, занимает две строки */
+.service-card--primary {
+    grid-row: 1 / 3;
+}
+
+.service-card--primary .service-card-img {
+    height: 280px;
+}
+
+.service-card {
+    display: block;
+    text-decoration: none;
+    color: inherit;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    overflow: hidden;
+    transition: box-shadow 0.25s, transform 0.25s;
+}
+
+.service-card:hover {
+    box-shadow: 0 8px 30px rgba(0,0,0,0.12);
+    transform: translateY(-3px);
+}
+
+.service-card-img {
+    height: 180px;
+    overflow: hidden;
+}
+
+.service-card-img img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+    display: block;
+}
+
+.service-card:hover .service-card-img img {
+    transform: scale(1.04);
+}
+
+.service-card--muted .service-card-img img {
+    filter: grayscale(20%);
+}
+
+.service-card-body {
+    padding: 20px 22px 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.service-card-body h3 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 22px;
+    font-weight: 500;
+    color: var(--text-dark);
+    line-height: 1.2;
+}
+
+.service-card-body p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.5;
+    flex: 1;
+}
+
+.service-price {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--primary);
+    margin-top: 4px;
+}
+
+.service-cta {
+    font-size: 13px;
+    color: var(--primary);
+    font-weight: 500;
+    letter-spacing: 0.2px;
+    transition: letter-spacing 0.2s;
+}
+
+.service-card:hover .service-cta {
+    letter-spacing: 0.6px;
+}
+
+/* ─── Как это работает ─── */
+.how-section {
+    padding: clamp(50px, 7vw, 100px) 0;
+    background: var(--bg-light);
+}
+
+.how-section .section-title { margin-bottom: 8px; }
+
+.how-steps {
+    display: flex;
+    align-items: flex-start;
+    gap: 0;
+    margin-top: 10px;
+}
+
+.how-step {
+    flex: 1;
+    padding: 36px 32px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    position: relative;
+}
+
+.how-step-num {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: 56px;
+    font-weight: 600;
+    color: rgba(0,118,116,0.08);
+    line-height: 1;
+    position: absolute;
+    top: 16px;
+    right: 20px;
+    pointer-events: none;
+    user-select: none;
+}
+
+.how-step-icon {
+    font-size: 32px;
+    margin-bottom: 14px;
+    display: block;
+}
+
+.how-step h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 8px;
+    letter-spacing: 0.1px;
+}
+
+.how-step p {
+    font-size: 14px;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+.how-step-arrow {
+    font-size: 22px;
+    color: #ccc;
+    padding: 0 4px;
+    align-self: center;
+    flex-shrink: 0;
+    margin-top: -20px;
+}
+
+/* ─── Преимущества ─── */
+.features-section {
+    padding: clamp(50px, 7vw, 100px) 0;
+    background: #fff;
+}
+
+.features-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 1px;
+    background: #e8e8e8;
+    border: 1px solid #e8e8e8;
+}
+
+.feature-item {
+    background: #fff;
+    padding: 36px 28px;
+    transition: background 0.2s;
+}
+
+.feature-item:hover {
+    background: #f9fffe;
+}
+
+.feature-icon {
+    font-size: 28px;
+    margin-bottom: 14px;
+    display: block;
+}
+
+.feature-item h3 {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text-dark);
+    margin-bottom: 10px;
+    line-height: 1.3;
+}
+
+.feature-item p {
+    font-size: 13px;
+    color: var(--text-muted);
+    line-height: 1.6;
+}
+
+/* ─── CTA секция ─── */
+.cta-section {
+    position: relative;
+    height: clamp(280px, 40vh, 480px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    overflow: hidden;
+}
+
+.cta-bg {
+    position: absolute;
+    inset: 0;
+}
+
+.cta-bg img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 60%;
+}
+
+.cta-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+}
+
+.cta-content {
+    position: relative;
+    z-index: 1;
+    color: #fff;
+    padding: 20px;
+}
+
+.cta-content h2 {
+    font-family: 'Cormorant Garamond', Georgia, serif;
+    font-size: clamp(28px, 4vw, 52px);
+    font-weight: 500;
+    margin-bottom: 14px;
+    letter-spacing: -0.01em;
+}
+
+.cta-content p {
+    font-size: clamp(14px, 1.6vw, 17px);
+    color: rgba(255,255,255,0.75);
+    margin-bottom: 28px;
+}
+
+.cta-btn {
+    background: #fff !important;
+    color: var(--text-dark) !important;
+    border: none;
+    font-weight: 600;
+    padding: 16px 40px;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+    transition: background 0.2s, transform 0.15s !important;
+}
+
+.cta-btn:hover {
+    background: #f0f0f0 !important;
+    transform: translateY(-1px);
+}
+
+/* ─── Адаптив ─── */
+@media (max-width: 1024px) {
+    .services-grid {
+        grid-template-columns: 1fr 1fr;
+        grid-template-rows: auto;
+    }
+    .service-card--primary { grid-row: auto; }
+    .features-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 768px) {
+    .hero-v2-stats { flex-wrap: wrap; gap: 16px; }
+    .hero-stat-divider { display: none; }
+    .how-steps { flex-direction: column; }
+    .how-step-arrow { display: none; }
+    .services-grid { grid-template-columns: 1fr; }
+    .features-grid { grid-template-columns: 1fr 1fr; }
+    .promo-banner { font-size: 13px; }
+}
+
+@media (max-width: 480px) {
+    .features-grid { grid-template-columns: 1fr; }
+    .hero-v2-actions { flex-direction: column; align-items: flex-start; }
+}

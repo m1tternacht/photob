@@ -228,7 +228,21 @@
                             <!-- Размеры загрузятся динамически -->
                         </select>
                     </div>
-                    
+
+                    <div class="editor-option">
+                        <label>Рамка</label>
+                        <div class="editor-frame-settings">
+                            <select id="editor-frame">
+                                <option value="none">Без рамки</option>
+                                <option value="white">Белая рамка</option>
+                            </select>
+                            <div class="editor-frame-size-wrap" id="editor-frame-size-wrap" style="display:none;">
+                                <input type="number" id="editor-frame-size" min="1" max="10" value="3">
+                                <span>мм</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <div class="editor-option">
                         <label>Поворот</label>
                         <div class="rotate-buttons">
@@ -266,7 +280,7 @@
                     
                     <div class="editor-option">
                         <label>Зум</label>
-                        <input type="range" id="editor-zoom" min="100" max="200" value="100">
+                        <input type="range" id="editor-zoom" min="50"  max="200" value="100">
                     </div>
                     
                     <button class="btn-apply-editor" id="btn-apply-editor">Применить</button>
@@ -337,6 +351,49 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/heic2any/0.0.4/heic2any.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.min.js"></script>
     <script src="/frontend/app-header.js"></script>
+    <script src="../gallery-picker.js"></script>
     <script src="print-app.js"></script>
+
+    <!-- Модалка "Добавить фото" (btn-add-more) -->
+    <div class="modal" id="add-more-modal">
+        <div class="modal-content add-more-modal-content">
+            <button class="modal-close" id="add-more-modal-close">&times;</button>
+            <h2 class="modal-title">Добавить фотографии</h2>
+            <div class="add-more-sources">
+                <label class="source-card" id="add-more-upload">
+                    <div class="source-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <span class="source-name">Загрузить</span>
+                    <input type="file" id="file-input-more" multiple accept=".jpg,.jpeg,.png,.bmp,.heic,.webp,.tiff,.tif" hidden>
+                </label>
+                <button class="source-card" id="add-more-gallery">
+                    <div class="source-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                            <circle cx="8.5" cy="8.5" r="1.5"/>
+                            <polyline points="21 15 16 10 5 21"/>
+                        </svg>
+                    </div>
+                    <span class="source-name">Галерея</span>
+                </button>
+                <button class="source-card disabled" title="Скоро">
+                    <div class="source-icon">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                            <path d="M2 17l10 5 10-5"/>
+                            <path d="M2 12l10 5 10-5"/>
+                        </svg>
+                    </div>
+                    <span class="source-name">Yandex.Disk</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
 </body>
 </html>

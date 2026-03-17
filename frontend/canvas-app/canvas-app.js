@@ -15,6 +15,10 @@ const AppState = {
     papers: [], // { value, label, coefficient } - загружаются с API
     projectId: null, // UUID проекта в БД
     projectName: 'Проект печати на холсте',
+    defaultProjectName: 'Проект печати на холсте',
+    hasUnsavedChanges: false,
+    saveStatus: 'none',
+    projectStartTime: null,
     totalPrice: 0,
     fullImageWarningShown: false, // показано ли предупреждение о полях
     sortOrder: 'asc' // 'asc' или 'desc'
@@ -39,6 +43,8 @@ document.addEventListener('DOMContentLoaded', () => {
     initStepNavigation();
     initUploadSources();
     initGalleryPicker();
+    initProjectNameInput();
+    initAddMoreModal();
     initSettingsPage();
     initPreviewPage();
     initEditorModal();
@@ -489,11 +495,8 @@ function initUploadSources() {
     sourceGallery?.addEventListener('click', () => showGalleryPicker());
 
     btnAddMore?.addEventListener('click', () => {
-        if (AppState.currentStep === 1) {
-            fileInput.click();
-        } else {
-            goToStep(1);
-        }
+        if (AppState.currentStep !== 1) goToStep(1);
+        openAddMoreModal();
     });
 
     // Drag and drop
@@ -795,60 +798,95 @@ function removePhoto(id) {
 }
 
 // ==================== GALLERY PICKER ====================
-function initGalleryPicker() {
-    const tabUpload = document.getElementById('tab-upload');
-    const tabGallery = document.getElementById('tab-gallery');
 
-    tabUpload?.addEventListener('click', () => document.getElementById('file-input').click());
-    tabGallery?.addEventListener('click', () => loadUserGalleries());
+// ==================== PROJECT NAME ====================
+function initProjectNameInput() {
+    const input = document.getElementById('project-name');
+    if (input) {
+        input.value = AppState.projectName;
+        input.addEventListener('input', (e) => {
+            AppState.projectName = e.target.value.trim() || AppState.defaultProjectName;
+            markAsChanged();
+        });
+    }
 }
 
-function showGalleryPicker() {
-    document.getElementById('upload-sources').style.display = 'none';
-    document.getElementById('gallery-picker').style.display = 'block';
-    loadUserGalleries();
+// ==================== SAVE STATUS ====================
+function markAsChanged() {
+    AppState.hasUnsavedChanges = true;
+    updateSaveStatus('not-saved');
+    if (!AppState.projectStartTime && AppState.photos.length > 0) {
+        AppState.projectStartTime = Date.now();
+    }
 }
 
-async function loadUserGalleries() {
-    const galleriesList = document.getElementById('galleries-list');
-    const galleryPhotos = document.getElementById('gallery-photos');
+function updateSaveStatus(status) {
+    AppState.saveStatus = status;
+    const statusEl = document.getElementById('save-status');
+    if (!statusEl) return;
+    statusEl.className = 'save-status ' + status;
+    const iconEl = statusEl.querySelector('.save-status-icon');
+    const textEl = statusEl.querySelector('.save-status-text');
+    switch (status) {
+        case 'saved':
+            if (iconEl) iconEl.textContent = '✓';
+            if (textEl) textEl.textContent = 'Сохранено';
+            break;
+        case 'not-saved':
+            if (iconEl) iconEl.textContent = '○';
+            if (textEl) textEl.textContent = 'Не сохранено';
+            break;
+        case 'saving':
+            if (iconEl) iconEl.textContent = '↻';
+            if (textEl) textEl.textContent = 'Сохранение...';
+            break;
+        default:
+            if (iconEl) iconEl.textContent = '○';
+            if (textEl) textEl.textContent = 'Не сохранено';
+    }
+}
 
-    galleriesList.style.display = 'flex';
-    galleryPhotos.style.display = 'none';
+// ==================== ADD-MORE MODAL ====================
+function initAddMoreModal() {
+    const modal    = document.getElementById('add-more-modal');
+    const closeBtn = document.getElementById('add-more-modal-close');
+    const fileInputMore = document.getElementById('file-input-more');
+    const btnGallery    = document.getElementById('add-more-gallery');
+    if (!modal) return;
 
-    // TODO: API
-    const galleries = [
-        { id: 1, name: 'Отпуск 2025', photosCount: 24, thumbs: [] },
-        { id: 2, name: 'Семейные фото', photosCount: 48, thumbs: [] }
-    ];
+    closeBtn?.addEventListener('click', closeAddMoreModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeAddMoreModal(); });
 
-    galleriesList.innerHTML = galleries.map(g => `
-        <div class="gallery-item" data-id="${g.id}">
-            <div class="gallery-thumb">
-                <div class="gallery-photo-count"><span>${g.photosCount}</span> фото</div>
-                <div class="gallery-thumb-placeholder"></div>
-                <div class="gallery-thumb-placeholder"></div>
-                <div class="gallery-thumb-placeholder"></div>
-                <div class="gallery-thumb-placeholder"></div>
-            </div>
-            <div class="gallery-name">${g.name}</div>
-        </div>
-    `).join('');
+    fileInputMore?.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            closeAddMoreModal();
+            handleFileUpload(e.target.files);
+            e.target.value = '';
+        }
+    });
 
-    galleriesList.querySelectorAll('.gallery-item').forEach(item => {
-        item.addEventListener('click', () => loadGalleryPhotos(item.dataset.id));
+    btnGallery?.addEventListener('click', () => {
+        closeAddMoreModal();
+        GalleryPicker.show();
     });
 }
 
-async function loadGalleryPhotos(galleryId) {
-    const galleriesList = document.getElementById('galleries-list');
-    const galleryPhotos = document.getElementById('gallery-photos');
-
-    galleriesList.style.display = 'none';
-    galleryPhotos.style.display = 'block';
-    galleryPhotos.innerHTML = '<p style="padding: 20px; color: #999;">Загрузка фото из галереи...</p>';
+function openAddMoreModal() {
+    document.getElementById('add-more-modal')?.classList.add('active');
 }
 
+function closeAddMoreModal() {
+    document.getElementById('add-more-modal')?.classList.remove('active');
+}
+
+function initGalleryPicker() {
+    const tabUpload = document.getElementById('tab-upload');
+    tabUpload?.addEventListener('click', () => document.getElementById('file-input').click());
+    GalleryPicker.init();
+}
+function showGalleryPicker() {
+    GalleryPicker.show();
+}
 // ==================== SETTINGS PAGE (STEP 2) ====================
 function initSettingsPage() {
     const sortBy = document.getElementById('sort-by');
@@ -1646,8 +1684,14 @@ function updateEditorZoom(newZoom) {
     const photo = AppState.photos[currentEditorPhotoIndex];
     if (!photo) return;
 
-    // Просто обновляем зум, позиция сохраняется
-    photo.settings.crop.zoom = newZoom;
+    // fullImage-режим: зум не ниже 100% (иначе появятся поля)
+    const clampedZoom = photo.settings.fullImage ? Math.max(100, newZoom) : Math.max(50, newZoom);
+    photo.settings.crop.zoom = clampedZoom;
+
+    // Синхронизируем слайдер на случай если зум был зажат
+    const slider = document.getElementById('editor-zoom');
+    if (slider && parseInt(slider.value) !== clampedZoom) slider.value = clampedZoom;
+
     renderEditorCanvas();
 }
 
@@ -1731,10 +1775,18 @@ function startDrag(e) {
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
 
-    editorDragState.startX = clientX;
-    editorDragState.startY = clientY;
+    editorDragState.startX  = clientX;
+    editorDragState.startY  = clientY;
     editorDragState.offsetX = photo.settings.crop.x;
     editorDragState.offsetY = photo.settings.crop.y;
+
+    // Запоминаем размеры рамки и CSS-размеры img для clamping в onDrag
+    const cropFrame = document.getElementById('crop-frame');
+    const imgEl     = document.getElementById('editor-image');
+    editorDragState.frameW  = cropFrame ? cropFrame.offsetWidth  : 400;
+    editorDragState.frameH  = cropFrame ? cropFrame.offsetHeight : 300;
+    editorDragState.imgCssW = imgEl     ? imgEl.offsetWidth      : 200;
+    editorDragState.imgCssH = imgEl     ? imgEl.offsetHeight     : 200;
 }
 
 function onDrag(e) {
@@ -1751,8 +1803,15 @@ function onDrag(e) {
     const deltaX = clientX - editorDragState.startX;
     const deltaY = clientY - editorDragState.startY;
 
-    photo.settings.crop.x = editorDragState.offsetX + deltaX;
-    photo.settings.crop.y = editorDragState.offsetY + deltaY;
+    const newX = editorDragState.offsetX + deltaX;
+    const newY = editorDragState.offsetY + deltaY;
+
+    // Clamping: минимум 1/3 фото должна оставаться внутри рамки
+    const maxCropX = editorDragState.frameW / 2 + editorDragState.imgCssW / 6;
+    const maxCropY = editorDragState.frameH / 2 + editorDragState.imgCssH / 6;
+
+    photo.settings.crop.x = Math.max(-maxCropX, Math.min(maxCropX, newX));
+    photo.settings.crop.y = Math.max(-maxCropY, Math.min(maxCropY, newY));
 
     // Перерисовываем для корректного обновления позиций
     renderEditorCanvas();
@@ -2061,21 +2120,43 @@ async function handleSaveProject() {
     const originalText = btnSave?.textContent;
 
     try {
-        if (btnSave) {
-            btnSave.textContent = 'Сохранение...';
-            btnSave.disabled = true;
-        }
+        updateSaveStatus('saving');
+        if (btnSave) { btnSave.textContent = 'Сохранение...'; btnSave.disabled = true; }
 
         await saveProject();
-        alert('Проект сохранён!');
+        AppState.hasUnsavedChanges = false;
+        updateSaveStatus('saved');
 
     } catch (e) {
         console.error('Save failed:', e);
-        alert('Ошибка сохранения. Попробуйте позже.');
+        updateSaveStatus('not-saved');
     } finally {
-        if (btnSave) {
-            btnSave.textContent = originalText;
-            btnSave.disabled = false;
-        }
+        if (btnSave) { btnSave.textContent = originalText; btnSave.disabled = false; }
     }
 }
+
+// ==================== GALLERY PICKER CALLBACK ====================
+window.onGalleryPhotosSelected = async function(photos) {
+    for (const p of photos) {
+        const id  = Date.now() + Math.random().toString(36).substr(2, 9);
+        const url = URL.createObjectURL(p.blob);
+        const aspectRatio = calculateAspectRatio(p.width, p.height);
+        const orientation = getOrientation(p.width, p.height);
+        AppState.photos.push({
+            id,
+            file:         p.blob,
+            originalFile: p.blob,
+            url,
+            name:         p.name,
+            width:        p.width,
+            height:       p.height,
+            aspectRatio,
+            orientation,
+            settings:     getDefaultSettings(orientation)
+        });
+    }
+    updatePhotosCount();
+    renderUploadedPhotos();
+    showUploadedPhotos();
+    markAsChanged();
+};

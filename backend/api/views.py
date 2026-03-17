@@ -584,16 +584,30 @@ def process_order_photos(order, project):
 
 
 def process_print_photo(img, settings):
-    """Обработка фото для обычной печати"""
+    """Обработка фото для обычной печати с опциональной белой рамкой"""
     size_str = settings.get('size', '10x15')
     target_w, target_h = get_print_size_pixels(size_str, dpi=300)
     target_ratio = target_w / target_h
-    
+
     img = apply_crop_and_zoom(img, settings, target_ratio)
-    
+
     # Ресайзим до точного размера печати
     img = img.resize((target_w, target_h), Image.LANCZOS)
-    
+
+    # Белая рамка: прожигаем в пиксели при 300 DPI
+    if settings.get('frame') == 'white':
+        frame_mm = float(settings.get('frameSize', 3))
+        frame_mm = max(0.5, min(10.0, frame_mm))          # ограничиваем 0.5–10 мм
+        frame_px = int(round(frame_mm / 25.4 * 300))      # мм → пиксели при 300 DPI
+
+        inner_w = target_w - 2 * frame_px
+        inner_h = target_h - 2 * frame_px
+        if inner_w > 0 and inner_h > 0:
+            inner = img.resize((inner_w, inner_h), Image.LANCZOS)
+            framed = Image.new('RGB', (target_w, target_h), (255, 255, 255))
+            framed.paste(inner, (frame_px, frame_px))
+            img = framed
+
     return img
 
 

@@ -3,59 +3,187 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Printique</title>
+    <title>Photobond — онлайн фотопечать</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;500;600&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="landing.css">
 </head>
-
-
-<script>
-fetch('http://127.0.0.1:8000/api/test/')
-  .then(response => response.json())
-  .then(data => {
-    console.log('Ответ от бэкенда:', data);
-  })
-  .catch(error => {
-    console.error('Ошибка:', error);
-  });
-</script>
-
-
-
-
 <body>
-    
-    <div id="header-container"></div>
     <div class="overlay" id="overlay"></div>
-    <!-- Уникальный контент главной страницы -->
-    <section class="hero">
-        <div class="hero-image">
-            <img src="https://via.placeholder.com/1920x1080" alt="Hero Image">
-        </div>
-        <div class="hero-content">
-            <h1>Printique</h1>
-            <p>Ваши воспоминания в лучшем качестве</p>
-            <a href="photoprint.html" class="btn btn-large">Заказать сейчас</a>
-        </div>
-    </section>
+    <div id="header-container"></div>
 
-    <section class="products">
-        <h2>Наши услуги</h2>
-        <div class="carousel-container">
-            <button class="carousel-btn prev">❮</button>
-            <div class="carousel">
-                <div class="product-grid">
-                    <!-- Карточки добавляются через JS -->
+    <!-- ═══ АКЦИОННЫЙ БАННЕР ═══ -->
+    <div class="promo-banner">
+        <span class="promo-tag">Акция</span>
+        Первый заказ — скидка 15% по промокоду <strong>PHOTO15</strong>
+        <a href="photoprint.html" class="promo-link">Заказать →</a>
+    </div>
+
+    <!-- ═══ HERO ═══ -->
+    <section class="hero-v2">
+        <div class="hero-v2-bg">
+            <img src="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="">
+            <div class="hero-v2-overlay"></div>
+        </div>
+        <div class="hero-v2-content">
+            <p class="hero-v2-eyebrow">Онлайн фотопечать</p>
+            <h1 class="hero-v2-title">Ваши фотографии<br>в лучшем качестве</h1>
+            <p class="hero-v2-sub">Загрузите фото, выберите формат — доставим готовый заказ</p>
+            <div class="hero-v2-actions">
+                <a href="print-app/index.html" class="btn btn-large hero-btn-primary">Начать заказ</a>
+                <a href="#services" class="btn-outline-white">Все услуги ↓</a>
+            </div>
+            <div class="hero-v2-stats">
+                <div class="hero-stat">
+                    <span class="hero-stat-num">300 DPI</span>
+                    <span class="hero-stat-label">Качество печати</span>
+                </div>
+                <div class="hero-stat-divider"></div>
+                <div class="hero-stat">
+                    <span class="hero-stat-num">1–3 дня</span>
+                    <span class="hero-stat-label">Срок изготовления</span>
+                </div>
+                <div class="hero-stat-divider"></div>
+                <div class="hero-stat">
+                    <span class="hero-stat-num">от 8 ₽</span>
+                    <span class="hero-stat-label">Фото 10×15</span>
                 </div>
             </div>
-            <button class="carousel-btn next">❯</button>
         </div>
     </section>
 
-    <!-- Уникальный текст для главной страницы -->
-    
+    <!-- ═══ УСЛУГИ ═══ -->
+    <section class="services-section" id="services">
+        <div class="section-container">
+            <h2 class="section-title">Что можно заказать</h2>
+            <div class="services-grid">
+
+                <a href="print-app/index.html" class="service-card service-card--primary">
+                    <div class="service-card-img">
+                        <img src="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Фотопечать">
+                    </div>
+                    <div class="service-card-body">
+                        <h3>Фотопечать</h3>
+                        <p>10×15, 13×18, 15×21, 20×30 и другие форматы. Глянцевая и матовая бумага.</p>
+                        <span class="service-price">от 8 ₽ / фото</span>
+                        <span class="service-cta">Заказать →</span>
+                    </div>
+                </a>
+
+                <a href="canvas-app/index.html" class="service-card">
+                    <div class="service-card-img">
+                        <img src="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="Печать на холсте">
+                    </div>
+                    <div class="service-card-body">
+                        <h3>Печать на холсте</h3>
+                        <p>30×40 до 80×120 см. Натуральный хлопковый холст, готов к вешанию.</p>
+                        <span class="service-price">от 890 ₽</span>
+                        <span class="service-cta">Заказать →</span>
+                    </div>
+                </a>
+
+                <a href="polaroid-app/index.html" class="service-card">
+                    <div class="service-card-img">
+                        <img src="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="Полароид">
+                    </div>
+                    <div class="service-card-body">
+                        <h3>Полароид</h3>
+                        <p>Ретро-формат 9×13 см с фирменной белой рамкой. Отличный подарок.</p>
+                        <span class="service-price">от 25 ₽ / шт</span>
+                        <span class="service-cta">Заказать →</span>
+                    </div>
+                </a>
+
+                <a href="photobooks.html" class="service-card service-card--muted">
+                    <div class="service-card-img">
+                        <img src="/frontend/images/jonny-caspari-KuudDjBHIlA-unsplash.jpg" alt="Фотокниги">
+                    </div>
+                    <div class="service-card-body">
+                        <h3>Фотокниги</h3>
+                        <p>Твёрдая обложка, раскрытие 180°. Идеальная память о путешествиях и событиях.</p>
+                        <span class="service-price">от 690 ₽</span>
+                        <span class="service-cta">Подробнее →</span>
+                    </div>
+                </a>
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ КАК ЭТО РАБОТАЕТ ═══ -->
+    <section class="how-section">
+        <div class="section-container">
+            <h2 class="section-title">Как сделать заказ</h2>
+            <p class="section-subtitle">Три шага — и фотографии у вас дома</p>
+            <div class="how-steps">
+                <div class="how-step">
+                    <div class="how-step-num">01</div>
+                    <div class="how-step-icon">📁</div>
+                    <h3>Загрузите фото</h3>
+                    <p>С компьютера, телефона или из личной галереи на сайте. Поддерживаются JPG, PNG, HEIC и TIFF.</p>
+                </div>
+                <div class="how-step-arrow">→</div>
+                <div class="how-step">
+                    <div class="how-step-num">02</div>
+                    <div class="how-step-icon">🎛️</div>
+                    <h3>Настройте</h3>
+                    <p>Выберите формат, бумагу, кадрируйте и настройте каждое фото прямо в браузере.</p>
+                </div>
+                <div class="how-step-arrow">→</div>
+                <div class="how-step">
+                    <div class="how-step-num">03</div>
+                    <div class="how-step-icon">📦</div>
+                    <h3>Получите</h3>
+                    <p>Обработаем и напечатаем заказ за 1–3 дня. Доставим курьером или в пункт выдачи.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ ПРЕИМУЩЕСТВА ═══ -->
+    <section class="features-section">
+        <div class="section-container">
+            <div class="features-grid">
+                <div class="feature-item">
+                    <div class="feature-icon">🖨️</div>
+                    <h3>Профессиональное оборудование</h3>
+                    <p>Печать на лабораторном оборудовании — 300 DPI, точная цветопередача, без полос и артефактов.</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">💧</div>
+                    <h3>Качественные материалы</h3>
+                    <p>Только сертифицированная фотобумага от ведущих производителей. Глянец, матовая, Fine-Art.</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">⚡</div>
+                    <h3>Быстрая обработка</h3>
+                    <p>Большинство заказов выполняем за 1 рабочий день. Экспресс-печать доступна в день заказа.</p>
+                </div>
+                <div class="feature-item">
+                    <div class="feature-icon">🔒</div>
+                    <h3>Безопасная оплата</h3>
+                    <p>Оплата картой, СБП или наличными при получении. Гарантия возврата при браке.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══ CTA-БАННЕР ═══ -->
+    <section class="cta-section">
+        <div class="cta-bg">
+            <img src="/frontend/images/bianca-ackermann-40dpU4ULfFw-unsplash.jpg" alt="">
+            <div class="cta-overlay"></div>
+        </div>
+        <div class="cta-content">
+            <h2>Готовы напечатать фотографии?</h2>
+            <p>Загрузите фото прямо сейчас — это займёт пару минут</p>
+            <a href="print-app/index.html" class="btn btn-large cta-btn">Загрузить фото</a>
+        </div>
+    </section>
 
     <div id="footer-common-container"></div>
-    
     <script src="script.js"></script>
 </body>
 </html>

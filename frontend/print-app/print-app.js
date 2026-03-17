@@ -899,13 +899,15 @@ function initUploadSources() {
     sourceGallery?.addEventListener('click', () => showGalleryPicker());
     
     btnAddMore?.addEventListener('click', () => {
-        if (AppState.currentStep === 1) {
-            fileInput.click();
-        } else {
+        if (AppState.currentStep !== 1) {
             goToStep(1);
         }
+        openAddMoreModal();
     });
     
+    // Модалка "Добавить"
+    initAddMoreModal();
+
     // Drag and drop
     const appContent = document.querySelector('.app-content');
     
@@ -1255,57 +1257,81 @@ function removePhoto(id) {
 
 // ==================== GALLERY PICKER ====================
 function initGalleryPicker() {
-    const tabUpload = document.getElementById('tab-upload');
-    const tabGallery = document.getElementById('tab-gallery');
-    
-    tabUpload?.addEventListener('click', () => document.getElementById('file-input').click());
-    tabGallery?.addEventListener('click', () => loadUserGalleries());
+    GalleryPicker.init();
+
+    // tab «Загрузить» → открыть file input
+    document.getElementById('tab-upload')
+        ?.addEventListener('click', () => document.getElementById('file-input').click());
+
+    // Колбэк: фото выбраны из галереи → добавить в AppState
+    window.onGalleryPhotosSelected = async function(photos) {
+        for (const p of photos) {
+            const id  = Date.now() + Math.random().toString(36).substr(2, 9);
+            const url = URL.createObjectURL(p.blob);
+            const dimensions = p.width && p.height
+                ? { width: p.width, height: p.height }
+                : await getImageDimensions(p.blob);
+            AppState.photos.push({
+                id,
+                file: p.blob,
+                originalFile: p.blob,
+                url,
+                name: p.name,
+                width:  dimensions.width,
+                height: dimensions.height,
+                aspectRatio: calculateAspectRatio(dimensions.width, dimensions.height),
+                orientation: getOrientation(dimensions.width, dimensions.height),
+                settings: getDefaultSettings(getOrientation(dimensions.width, dimensions.height))
+            });
+        }
+        updatePhotosCount();
+        renderUploadedPhotos();
+        showUploadedPhotos();
+        markAsChanged();
+    };
 }
 
-function showGalleryPicker() {
-    document.getElementById('upload-sources').style.display = 'none';
-    document.getElementById('gallery-picker').style.display = 'block';
-    loadUserGalleries();
-}
 
-async function loadUserGalleries() {
-    const galleriesList = document.getElementById('galleries-list');
-    const galleryPhotos = document.getElementById('gallery-photos');
-    
-    galleriesList.style.display = 'flex';
-    galleryPhotos.style.display = 'none';
-    
-    // TODO: API
-    const galleries = [
-        { id: 1, name: 'Отпуск 2025', photosCount: 24, thumbs: [] },
-        { id: 2, name: 'Семейные фото', photosCount: 48, thumbs: [] }
-    ];
-    
-    galleriesList.innerHTML = galleries.map(g => `
-        <div class="gallery-item" data-id="${g.id}">
-            <div class="gallery-thumb">
-                <div class="gallery-photo-count"><span>${g.photosCount}</span> фото</div>
-                <div class="gallery-thumb-placeholder"></div>
-                <div class="gallery-thumb-placeholder"></div>
-                <div class="gallery-thumb-placeholder"></div>
-                <div class="gallery-thumb-placeholder"></div>
-            </div>
-            <div class="gallery-name">${g.name}</div>
-        </div>
-    `).join('');
-    
-    galleriesList.querySelectorAll('.gallery-item').forEach(item => {
-        item.addEventListener('click', () => loadGalleryPhotos(item.dataset.id));
+// ==================== ADD-MORE MODAL ====================
+
+function initAddMoreModal() {
+    const modal    = document.getElementById('add-more-modal');
+    const closeBtn = document.getElementById('add-more-modal-close');
+    const fileInputMore = document.getElementById('file-input-more');
+    const btnGallery    = document.getElementById('add-more-gallery');
+
+    if (!modal) return;
+
+    // Закрытие
+    closeBtn?.addEventListener('click', closeAddMoreModal);
+    modal.addEventListener('click', (e) => { if (e.target === modal) closeAddMoreModal(); });
+
+    // Загрузить файлы — label сам открывает диалог нативно
+    fileInputMore?.addEventListener('change', (e) => {
+        if (e.target.files.length > 0) {
+            closeAddMoreModal();
+            handleFileUpload(e.target.files);
+            e.target.value = '';
+        }
+    });
+
+    // Галерея
+    btnGallery?.addEventListener('click', () => {
+        closeAddMoreModal();
+        GalleryPicker.show();
     });
 }
 
-async function loadGalleryPhotos(galleryId) {
-    const galleriesList = document.getElementById('galleries-list');
-    const galleryPhotos = document.getElementById('gallery-photos');
-    
-    galleriesList.style.display = 'none';
-    galleryPhotos.style.display = 'block';
-    galleryPhotos.innerHTML = '<p style="padding: 20px; color: #999;">Загрузка фото из галереи...</p>';
+function openAddMoreModal() {
+    document.getElementById('add-more-modal')?.classList.add('active');
+}
+
+function closeAddMoreModal() {
+    document.getElementById('add-more-modal')?.classList.remove('active');
+}
+
+function showGalleryPicker() {
+    GalleryPicker.show();
 }
 
 // ==================== SETTINGS PAGE (STEP 2) ====================
@@ -1442,7 +1468,15 @@ function renderSettingsPage() {
     });
     
     list.querySelectorAll('.setting-frame-size').forEach(input => {
-        input.addEventListener('change', (e) => updatePhotoSetting(e.target.dataset.id, 'frameSize', parseInt(e.target.value)));
+        input.addEventListener('input', (e) => {
+            if (parseInt(e.target.value) > 10) e.target.value = 10;
+            if (parseInt(e.target.value) < 1)  e.target.value = 1;
+        });
+        input.addEventListener('change', (e) => {
+            const val = Math.min(10, Math.max(1, parseInt(e.target.value) || 3));
+            e.target.value = val;
+            updatePhotoSetting(e.target.dataset.id, 'frameSize', val);
+        });
     });
     
     list.querySelectorAll('.setting-quantity').forEach(input => {
@@ -1612,6 +1646,17 @@ function renderPreviewPage(filter = 'all', groupBy = 'size') {
     });
 }
 
+
+// Строит overlay белой рамки поверх фото через inset box-shadow
+// previewSide — меньшая сторона превью-контейнера в px (для пересчёта мм→px)
+function buildFrameOverlay(photo, previewSide) {
+    if (photo.settings.frame !== 'white' || !(photo.settings.frameSize > 0)) return '';
+    const [printA, printB] = (photo.settings.size || '10x15').split('x').map(Number);
+    const printMinMm = Math.min(printA, printB) * 10; // см→мм
+    const borderPx = Math.max(2, Math.round(photo.settings.frameSize / printMinMm * previewSide));
+    return `<div class="preview-frame-overlay" style="box-shadow: inset 0 0 0 ${borderPx}px #fff;"></div>`;
+}
+
 function renderPreviewPhoto(photo) {
     const needsReview = needsCropping(photo);
     
@@ -1656,6 +1701,8 @@ function renderPreviewPhoto(photo) {
             }
         }
         
+        // Рамка режим 1: inset box-shadow поверх фото (не ломает layout)
+        const frameOverlay1 = buildFrameOverlay(photo, 120);
         return `
             <div class="preview-photo-item">
                 <div class="preview-photo-thumb preview-original" data-id="${photo.id}">
@@ -1663,6 +1710,7 @@ function renderPreviewPhoto(photo) {
                     ${cropIndicator}
                     ${editedIcon}
                     ${fullImageIcon}
+                    ${frameOverlay1}
                 </div>
                 <div class="preview-photo-name">${photo.name}</div>
                 <a href="#" class="preview-photo-edit" data-id="${photo.id}">редактировать</a>
@@ -1738,15 +1786,20 @@ function renderPreviewPhoto(photo) {
     const rotateStyle = photo.settings.rotation !== 0 ? `transform: rotate(${photo.settings.rotation}deg);` : '';
     const bgColor = photo.settings.fullImage ? '#fff' : 'transparent';
     
+    // Рамка режим 2: inset box-shadow overlay — не трогает позиционирование img
+    const frameOverlay2 = buildFrameOverlay(photo, Math.min(frameWidth, frameHeight));
+    const containerStyle2 = `width: ${frameWidth}px; height: ${frameHeight}px; background: ${bgColor};`;
+
     return `
         <div class="preview-photo-item">
             <div class="preview-photo-thumb preview-cropped ${needsReview && !photo.settings.fullImage ? 'needs-review' : ''}" 
                  data-id="${photo.id}"
-                 style="width: ${frameWidth}px; height: ${frameHeight}px; background: ${bgColor};">
+                 style="${containerStyle2}">
                 <img src="${photo.url}" alt="${photo.name}" 
                      style="width: ${imgWidth}px; height: ${imgHeight}px; left: ${imgLeft}px; top: ${imgTop}px; ${filterStyle} ${rotateStyle}">
                 ${editedIcon}
                 ${fullImageIcon}
+                ${frameOverlay2}
             </div>
             <div class="preview-photo-name">${photo.name}</div>
             <a href="#" class="preview-photo-edit" data-id="${photo.id}">редактировать</a>
@@ -1783,6 +1836,35 @@ function initEditorModal() {
     
     zoomSlider?.addEventListener('input', (e) => updateEditorZoom(parseInt(e.target.value)));
     sizeSelect?.addEventListener('change', (e) => updateEditorSize(e.target.value));
+
+    // Рамка в редакторе — live preview
+    document.getElementById('editor-frame')?.addEventListener('change', (e) => {
+        const wrap = document.getElementById('editor-frame-size-wrap');
+        if (wrap) wrap.style.display = e.target.value === 'white' ? 'flex' : 'none';
+        // Обновляем overlay сразу
+        const photo = AppState.photos[currentEditorPhotoIndex];
+        if (photo) {
+            photo.settings.frame = e.target.value;
+            const cropFrame = document.getElementById('crop-frame');
+            const fw = parseFloat(cropFrame?.style.width)  || 400;
+            const fh = parseFloat(cropFrame?.style.height) || 300;
+            updateEditorFrameOverlay(cropFrame, photo, fw, fh);
+        }
+    });
+    document.getElementById('editor-frame-size')?.addEventListener('input', (e) => {
+        let v = parseInt(e.target.value);
+        if (v > 10) { e.target.value = 10; v = 10; }
+        if (v < 1)  { e.target.value = 1;  v = 1;  }
+        // Обновляем overlay сразу
+        const photo = AppState.photos[currentEditorPhotoIndex];
+        if (photo) {
+            photo.settings.frameSize = v;
+            const cropFrame = document.getElementById('crop-frame');
+            const fw = parseFloat(cropFrame?.style.width)  || 400;
+            const fh = parseFloat(cropFrame?.style.height) || 300;
+            updateEditorFrameOverlay(cropFrame, photo, fw, fh);
+        }
+    });
     
     fullImageCheck?.addEventListener('change', (e) => {
         if (e.target.checked && !AppState.fullImageWarningShown) {
@@ -1941,6 +2023,17 @@ function renderEditor() {
         radio.checked = radio.value === photo.settings.filter;
     });
     
+    // Рамка
+    const editorFrame = document.getElementById('editor-frame');
+    const editorFrameSizeWrap = document.getElementById('editor-frame-size-wrap');
+    const editorFrameSize = document.getElementById('editor-frame-size');
+    if (editorFrame) {
+        editorFrame.value = photo.settings.frame || 'none';
+        if (editorFrameSize) editorFrameSize.value = Math.min(10, photo.settings.frameSize || 3);
+        if (editorFrameSizeWrap) editorFrameSizeWrap.style.display =
+            photo.settings.frame === 'white' ? 'flex' : 'none';
+    }
+
     // Рендерим canvas с рамкой
     renderEditorCanvas();
 }
@@ -2095,6 +2188,7 @@ function renderEditorCanvas() {
         const currentPhoto = AppState.photos[currentEditorPhotoIndex];
         if (currentPhoto && currentPhoto.id === photo.id) {
             applyImageStyles();
+            updateEditorFrameOverlay(cropFrame, photo, displayFrameWidth, displayFrameHeight);
         }
     };
     
@@ -2104,15 +2198,53 @@ function renderEditorCanvas() {
     // Если изображение уже в кэше, onload может не сработать - вызываем вручную
     if (img.complete && img.naturalWidth > 0) {
         applyImageStyles();
+        updateEditorFrameOverlay(cropFrame, photo, displayFrameWidth, displayFrameHeight);
     }
+}
+
+// Обновляет (или создаёт) overlay белой рамки поверх crop-frame в редакторе
+function updateEditorFrameOverlay(cropFrame, photo, frameW, frameH) {
+    let overlay = document.getElementById('editor-frame-overlay');
+
+    if (photo.settings.frame !== 'white' || !(photo.settings.frameSize > 0)) {
+        // Рамки нет — скрываем overlay если был
+        if (overlay) overlay.style.display = 'none';
+        return;
+    }
+
+    // Создаём overlay один раз
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'editor-frame-overlay';
+        overlay.style.cssText = [
+            'position:absolute', 'inset:0', 'pointer-events:none',
+            'z-index:5', 'transition:box-shadow 0.1s'
+        ].join(';');
+        cropFrame.appendChild(overlay);
+    }
+    overlay.style.display = 'block';
+
+    // Пересчитываем толщину рамки из мм → px превью
+    const [printA, printB] = (photo.settings.size || '10x15').split('x').map(Number);
+    const printMinMm  = Math.min(printA, printB) * 10;          // см→мм
+    const previewSide = Math.min(frameW, frameH);
+    const borderPx    = Math.max(2, Math.round(photo.settings.frameSize / printMinMm * previewSide));
+
+    overlay.style.boxShadow = `inset 0 0 0 ${borderPx}px #fff`;
 }
 
 function updateEditorZoom(newZoom) {
     const photo = AppState.photos[currentEditorPhotoIndex];
     if (!photo) return;
-    
-    // Просто обновляем зум, позиция сохраняется
-    photo.settings.crop.zoom = newZoom;
+
+    // fullImage-режим: зум не ниже 100% (иначе появятся поля)
+    const clampedZoom = photo.settings.fullImage ? Math.max(100, newZoom) : Math.max(50, newZoom);
+    photo.settings.crop.zoom = clampedZoom;
+
+    // Синхронизируем слайдер на случай если зум был зажат
+    const slider = document.getElementById('editor-zoom');
+    if (slider && parseInt(slider.value) !== clampedZoom) slider.value = clampedZoom;
+
     renderEditorCanvas();
 }
 
@@ -2187,17 +2319,25 @@ function rotatePhoto() {
 function startDrag(e) {
     const photo = AppState.photos[currentEditorPhotoIndex];
     if (!photo) return;
-    
+
     e.preventDefault();
     editorDragState.isDragging = true;
-    
+
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
-    editorDragState.startX = clientX;
-    editorDragState.startY = clientY;
+
+    editorDragState.startX  = clientX;
+    editorDragState.startY  = clientY;
     editorDragState.offsetX = photo.settings.crop.x;
     editorDragState.offsetY = photo.settings.crop.y;
+
+    // Запоминаем размеры рамки и CSS-размеры img для clamping в onDrag
+    const cropFrame = document.getElementById('crop-frame');
+    const imgEl     = document.getElementById('editor-image');
+    editorDragState.frameW  = cropFrame ? cropFrame.offsetWidth  : 400;
+    editorDragState.frameH  = cropFrame ? cropFrame.offsetHeight : 300;
+    editorDragState.imgCssW = imgEl     ? imgEl.offsetWidth      : 200;
+    editorDragState.imgCssH = imgEl     ? imgEl.offsetHeight     : 200;
 }
 
 function onDrag(e) {
@@ -2213,10 +2353,19 @@ function onDrag(e) {
     
     const deltaX = clientX - editorDragState.startX;
     const deltaY = clientY - editorDragState.startY;
-    
-    photo.settings.crop.x = editorDragState.offsetX + deltaX;
-    photo.settings.crop.y = editorDragState.offsetY + deltaY;
-    
+
+    const newX = editorDragState.offsetX + deltaX;
+    const newY = editorDragState.offsetY + deltaY;
+
+    // Clamping: минимум 1/3 фото должна оставаться внутри рамки.
+    // Формула: maxCrop = frameSize/2 + imgCssSize/6
+    // (выводится из условия overlap >= 1/3 * imgSize)
+    const maxCropX = editorDragState.frameW / 2 + editorDragState.imgCssW / 6;
+    const maxCropY = editorDragState.frameH / 2 + editorDragState.imgCssH / 6;
+
+    photo.settings.crop.x = Math.max(-maxCropX, Math.min(maxCropX, newX));
+    photo.settings.crop.y = Math.max(-maxCropY, Math.min(maxCropY, newY));
+
     // Перерисовываем для корректного обновления позиций
     renderEditorCanvas();
 }
@@ -2226,16 +2375,24 @@ function endDrag() {
 }
 
 function applyEditorChanges() {
-    // Сохраняем размер рамки редактора для правильного отображения в превью
     const photo = AppState.photos[currentEditorPhotoIndex];
     if (photo) {
         const cropFrame = document.getElementById('crop-frame');
         if (cropFrame) {
-            photo.settings.editorFrameWidth = cropFrame.offsetWidth;
+            photo.settings.editorFrameWidth  = cropFrame.offsetWidth;
             photo.settings.editorFrameHeight = cropFrame.offsetHeight;
         }
+        // Сохраняем рамку из редактора
+        const editorFrame     = document.getElementById('editor-frame');
+        const editorFrameSize = document.getElementById('editor-frame-size');
+        if (editorFrame) {
+            photo.settings.frame = editorFrame.value;
+            if (editorFrameSize) {
+                photo.settings.frameSize = Math.min(10, Math.max(1, parseInt(editorFrameSize.value) || 3));
+            }
+        }
     }
-    
+
     closeEditor();
     renderPreviewPage();
     updateTotalPrice();
